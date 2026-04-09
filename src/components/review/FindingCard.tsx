@@ -13,6 +13,7 @@ interface FindingCardProps {
   selectedAction?: string | null
   onActionSelect?: (actionId: string | null) => void
   showValidation?: boolean
+  trafficLight?: boolean
 }
 
 const severityConfig = {
@@ -21,12 +22,18 @@ const severityConfig = {
   low: { label: 'Aligned', className: 'text-green-600 border-green-300 bg-green-50' },
 }
 
-export function FindingCard({ finding, defaultOpen = false, isInserted = false, onInserted, selectedAction: controlledAction, onActionSelect, showValidation = false }: FindingCardProps) {
+const trafficLightConfig = {
+  high: { label: 'Below Fallback', className: 'text-red-600 border-red-300 bg-red-50' },
+  medium: { label: 'Within Fallback', className: 'text-amber-600 border-amber-300 bg-amber-50' },
+  low: { label: 'Within Standard', className: 'text-green-600 border-green-300 bg-green-50' },
+}
+
+export function FindingCard({ finding, defaultOpen = false, isInserted = false, onInserted, selectedAction: controlledAction, onActionSelect, showValidation = false, trafficLight = false }: FindingCardProps) {
   const [open, setOpen] = useState(defaultOpen)
   const [internalAction, setInternalAction] = useState<string | null>(null)
   const [insertingId, setInsertingId] = useState<string | null>(null)
   const [insertedActionId, setInsertedActionId] = useState<string | null>(null)
-  const config = severityConfig[finding.severity]
+  const config = trafficLight ? trafficLightConfig[finding.severity] : severityConfig[finding.severity]
   const hasActions = finding.actions && finding.actions.length > 0
 
   const selectedAction = controlledAction !== undefined ? controlledAction : internalAction

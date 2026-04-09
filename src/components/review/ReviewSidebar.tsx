@@ -3,6 +3,7 @@ import { ArrowLeft, X, Loader2, Check, Clock, ShieldCheck, FileText, RotateCcw, 
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { DocSourceSelector } from './DocSourceSelector'
+import { PositionDocSelector } from './PositionDocSelector'
 import { CounterpartyDocSelector } from './CounterpartyDocSelector'
 import { AreaSelector } from './AreaSelector'
 import { AuditConfig } from './AuditConfig'
@@ -16,11 +17,12 @@ import {
   mockFindings,
   benchmarkFindings,
   coverageFindings,
+  fallbackFindings,
   type MockDoc,
   type Finding,
 } from '@/data/mockReviewData'
 
-type Action = 'benchmark' | 'coverage' | 'clause' | 'audit' | 'counterparty' | 'definitions'
+type Action = 'benchmark' | 'coverage' | 'clause' | 'audit' | 'counterparty' | 'definitions' | 'fallback'
 type View = 'home' | 'select-doc' | 'select-areas' | 'audit-config' | 'loading' | 'results'
 type StepStatus = 'waiting' | 'loading' | 'done'
 
@@ -37,14 +39,24 @@ const actionLabels: Record<Action, string> = {
   audit: 'Contract Audit',
   counterparty: 'Compare against Previous Deals',
   definitions: 'Definitions Comparison',
+  fallback: 'Fallback Position Assessment',
 }
 
-function buildSteps(action: Action, doc: MockDoc | null, areaIds: string[]): AgentStep[] {
+function buildSteps(action: Action, doc: MockDoc | null, areaIds: string[], fallbackDoc?: MockDoc | null): AgentStep[] {
   const areas = comparisonAreas.filter((a) => areaIds.includes(a.id))
 
   let labels: string[]
 
-  if (action === 'benchmark' || action === 'counterparty') {
+  if (action === 'fallback') {
+    labels = [
+      'Reading your document',
+      doc ? `Reading "${doc.title}"` : 'Reading standard document',
+      fallbackDoc ? `Reading "${fallbackDoc.title}"` : 'Reading fallback document',
+      'Assessing against standard position',
+      'Assessing against fallback position',
+      'Generating traffic-light report',
+    ]
+  } else if (action === 'benchmark' || action === 'counterparty') {
     labels = [
       'Reading your document',
       doc ? `Reading "${doc.title}"` : 'Reading comparison document',
@@ -97,6 +109,7 @@ export function ReviewSidebar() {
   const [view, setView] = useState<View>('home')
   const [activeAction, setActiveAction] = useState<Action | null>(null)
   const [selectedDoc, setSelectedDoc] = useState<MockDoc | null>(null)
+  const [fallbackDoc, setFallbackDoc] = useState<MockDoc | null>(null)
   const [selectedCounterpartyId, setSelectedCounterpartyId] = useState<string | null>(null)
   const [selectedCounterpartyDocs, setSelectedCounterpartyDocs] = useState<MockDoc[]>([])
   const [isLoadingAreas, setIsLoadingAreas] = useState(false)
@@ -122,6 +135,7 @@ export function ReviewSidebar() {
     setView('home')
     setActiveAction(null)
     setSelectedDoc(null)
+    setFallbackDoc(null)
     setSelectedAreas([])
     setAuditPrompt('')
     setFindings([])
@@ -138,8 +152,8 @@ export function ReviewSidebar() {
     isRerunRef.current = false
   }
 
-  function startLoading(action: Action, doc: MockDoc | null, areaIds: string[]) {
-    const newSteps = buildSteps(action, doc, areaIds)
+  function startLoading(action: Action, doc: MockDoc | null, areaIds: string[], fallbackDocArg?: MockDoc | null) {
+    const newSteps = buildSteps(action, doc, areaIds, fallbackDocArg)
     setSteps(newSteps)
     setCurrentStepIndex(0)
     setView('loading')
@@ -148,6 +162,7 @@ export function ReviewSidebar() {
   function handleActionSelect(action: Action) {
     setActiveAction(action)
     setSelectedDoc(null)
+    setFallbackDoc(null)
     setSelectedAreas([])
     setAuditPrompt('')
 
@@ -175,6 +190,11 @@ export function ReviewSidebar() {
 
   function handleNext() {
     if (!activeAction) return
+    if (activeAction === 'fallback') {
+      if (!selectedDoc || !fallbackDoc) return
+      startLoading('fallback', selectedDoc, [], fallbackDoc)
+      return
+    }
     if (activeAction !== 'counterparty' && !selectedDoc) return
     if (activeAction === 'benchmark' || activeAction === 'definitions') {
       startLoading(activeAction, selectedDoc, [])
@@ -233,7 +253,9 @@ export function ReviewSidebar() {
               setRerunComplete(true)
             } else {
               let resultFindings: Finding[]
-              if (activeAction === 'benchmark' || activeAction === 'counterparty' || activeAction === 'definitions') {
+              if (activeAction === 'fallback') {
+                resultFindings = [...fallbackFindings]
+              } else if (activeAction === 'benchmark' || activeAction === 'counterparty' || activeAction === 'definitions') {
                 resultFindings = [...benchmarkFindings]
               } else if (activeAction === 'coverage') {
                 resultFindings = [...coverageFindings]
@@ -287,7 +309,9 @@ export function ReviewSidebar() {
   const actionLabel = activeAction ? actionLabels[activeAction] : ''
   const canNext = activeAction === 'counterparty'
     ? selectedCounterpartyDocs.length > 0
-    : selectedDoc !== null && selectedDoc.id !== ''
+    : activeAction === 'fallback'
+      ? selectedDoc !== null && selectedDoc.id !== '' && fallbackDoc !== null && fallbackDoc.id !== ''
+      : selectedDoc !== null && selectedDoc.id !== ''
   const canRun = selectedAreas.length > 0
   const canRunAudit = selectedAreas.length > 0 || auditPrompt.trim().length > 0
   const showBack = view === 'select-doc' || view === 'select-areas' || view === 'audit-config' || view === 'results'
@@ -297,7 +321,7 @@ export function ReviewSidebar() {
     ? (counterparties.find((cp) => cp.id === selectedCounterpartyId)?.name ?? null)
     : null
   const showDocInHeader = view !== 'home' && view !== 'select-doc' &&
-    (activeAction === 'counterparty' ? !!counterpartyName : !!(selectedDoc?.id))
+    (activeAction === 'counterparty' ? !!counterpartyName : !!(selectedDoc?.id)|| activeAction === 'fallback')
 
   function headerTitle() {
     if (view === 'home') return 'Review'
@@ -312,6 +336,7 @@ export function ReviewSidebar() {
         if (activeAction === 'benchmark') return 'Select a standard document to benchmark against.'
         if (activeAction === 'counterparty') return 'Select a previous document with this counterparty.'
         if (activeAction === 'definitions') return 'Select the document to compare definitions with.'
+        if (activeAction === 'fallback') return 'Select your standard and fallback documents.'
         return 'Select the document to compare clauses with.'
       case 'select-areas':
         return 'Select the clauses you\'d like to compare.'
@@ -325,6 +350,7 @@ export function ReviewSidebar() {
         if (activeAction === 'coverage') return `${n} area${n !== 1 ? 's' : ''} assessed${issueNote}.`
         if (activeAction === 'clause') return `${n} clause${n !== 1 ? 's' : ''} assessed${issueNote}.`
         if (activeAction === 'definitions') return `${n} definition${n !== 1 ? 's' : ''} assessed${issueNote}.`
+        if (activeAction === 'fallback') return `${n} area${n !== 1 ? 's' : ''} assessed against your positions${issueNote}.`
         return `${n} area${n !== 1 ? 's' : ''} assessed${issueNote}.`
       }
     }
@@ -364,11 +390,32 @@ export function ReviewSidebar() {
           </div>
         </div>
         {showDocInHeader && (
-          <div className="flex items-center gap-1.5" style={{ paddingLeft: showBack ? '2.25rem' : undefined }}>
-            <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-            <span className="text-xs text-muted-foreground truncate">
-              {activeAction === 'counterparty' ? counterpartyName : selectedDoc!.title}
-            </span>
+          <div className="space-y-1" style={{ paddingLeft: showBack ? '2.25rem' : undefined }}>
+            {activeAction === 'fallback' ? (
+              <>
+                {selectedDoc?.id && (
+                  <div className="flex items-center gap-1.5">
+                    <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">Standard: </span>
+                    <span className="text-xs text-foreground truncate">{selectedDoc.title}</span>
+                  </div>
+                )}
+                {fallbackDoc?.id && (
+                  <div className="flex items-center gap-1.5">
+                    <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">Fallback: </span>
+                    <span className="text-xs text-foreground truncate">{fallbackDoc.title}</span>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="flex items-center gap-1.5">
+                <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground truncate">
+                  {activeAction === 'counterparty' ? counterpartyName : selectedDoc!.title}
+                </span>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -390,7 +437,16 @@ export function ReviewSidebar() {
           />
         )}
 
-        {view === 'select-doc' && activeAction !== 'counterparty' && (
+        {view === 'select-doc' && activeAction === 'fallback' && (
+          <PositionDocSelector
+            standardDoc={selectedDoc}
+            fallbackDoc={fallbackDoc}
+            onStandardSelect={(doc) => { if (doc.id) setSelectedDoc(doc); else setSelectedDoc(null) }}
+            onFallbackSelect={(doc) => { if (doc.id) setFallbackDoc(doc); else setFallbackDoc(null) }}
+          />
+        )}
+
+        {view === 'select-doc' && activeAction !== 'counterparty' && activeAction !== 'fallback' && (
           <DocSourceSelector
             selectedDoc={selectedDoc}
             onDocSelect={handleDocSelect}
@@ -459,6 +515,7 @@ export function ReviewSidebar() {
                   setInsertValidation(false)
                 }}
                 showValidation={insertValidation}
+                trafficLight={activeAction === 'fallback'}
               />
             ))}
           </div>

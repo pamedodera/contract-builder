@@ -210,6 +210,65 @@ export const benchmarkFindings: Finding[] = [
   },
 ]
 
+// Used by Fallback Position Assessment (traffic-light: low=within standard, medium=within fallback, high=below fallback)
+export const fallbackFindings: Finding[] = [
+  {
+    id: 'fp1', areaId: 'liability-cap', areaLabel: 'Liability Cap', severity: 'high',
+    summary: 'Counterparty proposes uncapped liability; your fallback position requires a cap at 1× annual fees.',
+    detail: 'Your standard position caps aggregate liability at 2× annual contract value. Your fallback accepts a minimum of 1× annual fees. The counterparty draft contains no liability cap at all, which falls below your fallback position. An uncapped exposure is commercially unacceptable and must be negotiated before signature.',
+    actions: [
+      { id: 'fp1a', label: 'Insist on 2× annual fees cap (standard position)' },
+      { id: 'fp1b', label: 'Accept 1× annual fees cap (fallback position)' },
+    ],
+  },
+  {
+    id: 'fp2', areaId: 'termination', areaLabel: 'Termination Rights', severity: 'high',
+    summary: 'Counterparty notice period is 7 days; your fallback minimum is 30 days.',
+    detail: 'Your standard position requires 60 days written notice for termination for convenience. Your fallback accepts no fewer than 30 days. The counterparty proposes 7-day termination rights, which falls below your fallback threshold. This would leave insufficient time to transition services or mitigate losses on termination.',
+    actions: [
+      { id: 'fp2a', label: 'Require 60-day notice (standard position)' },
+      { id: 'fp2b', label: 'Negotiate minimum 30-day notice (fallback position)' },
+    ],
+  },
+  {
+    id: 'fp3', areaId: 'payment-terms', areaLabel: 'Payment Terms', severity: 'medium',
+    summary: 'Counterparty proposes 45-day payment terms; your standard is 30 days, fallback is 60 days.',
+    detail: 'Your standard position is 30-day payment terms with a late payment remedy. Your fallback accepts up to 60 days provided a late interest clause is included. The counterparty draft proposes 45 days, which sits between your standard and fallback positions. It is acceptable at fallback, but negotiating towards 30 days is preferred.',
+    actions: [
+      { id: 'fp3a', label: 'Negotiate to 30-day terms (standard position)' },
+      { id: 'fp3b', label: 'Accept 45-day terms with late payment interest (within fallback)' },
+    ],
+  },
+  {
+    id: 'fp4', areaId: 'confidentiality', areaLabel: 'Confidentiality', severity: 'medium',
+    summary: 'Post-termination survival is 2 years; your standard is 5 years, fallback accepts 3 years.',
+    detail: 'Your standard position requires post-termination confidentiality obligations to survive for 5 years. Your fallback accepts a minimum of 3 years. The counterparty draft specifies a 2-year survival period, which falls below your fallback position. Recommend negotiating up to at least 3 years to preserve your minimum acceptable position.',
+    actions: [
+      { id: 'fp4a', label: 'Require 5-year survival (standard position)' },
+      { id: 'fp4b', label: 'Accept 3-year survival as minimum (fallback position)' },
+    ],
+  },
+  {
+    id: 'fp5', areaId: 'ip-ownership', areaLabel: 'IP Ownership', severity: 'medium',
+    summary: 'IP assignment covers foreground IP only; your standard includes background IP licence.',
+    detail: 'Your standard position requires an assignment of all foreground IP and a broad licence of background IP used in deliverables. Your fallback accepts foreground assignment only, provided a non-exclusive background licence is granted. The counterparty draft assigns foreground IP but is silent on background IP, which sits at the boundary of your fallback. A background licence carve-out should be requested.',
+    actions: [
+      { id: 'fp5a', label: 'Add background IP licence (standard position)' },
+      { id: 'fp5b', label: 'Accept foreground-only assignment with retained background rights (fallback)' },
+    ],
+  },
+  {
+    id: 'fp6', areaId: 'governing-law', areaLabel: 'Governing Law', severity: 'low',
+    summary: 'English law and exclusive English court jurisdiction — within your standard position.',
+    detail: 'Your standard and fallback positions both require English governing law. The counterparty draft specifies English law and the exclusive jurisdiction of the courts of England and Wales. This is fully aligned with your standard position. No negotiation required on this point.',
+  },
+  {
+    id: 'fp7', areaId: 'dispute-resolution', areaLabel: 'Dispute Resolution', severity: 'low',
+    summary: 'Counterparty accepts LCIA arbitration — within your standard position.',
+    detail: 'Your standard position specifies LCIA arbitration in London with a sole arbitrator for disputes below £250k and a three-member panel above. The counterparty draft mirrors this mechanism in full. This is aligned with your standard position and requires no amendment.',
+  },
+]
+
 // Used by Coverage & Completeness
 export const coverageFindings: Finding[] = [
   {

@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { Scale, ListChecks, ArrowLeftRight, ClipboardCheck, History, BookOpen, ChevronDown } from 'lucide-react'
+import { Scale, ListChecks, ArrowLeftRight, ClipboardCheck, History, BookOpen, ChevronDown, Layers } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { counterparties } from '@/data/mockReviewData'
 
-type Action = 'benchmark' | 'coverage' | 'clause' | 'audit' | 'definitions'
+type Action = 'benchmark' | 'coverage' | 'clause' | 'audit' | 'definitions' | 'fallback'
 
 interface ActionSelectorProps {
   onSelect: (action: Action) => void
@@ -16,6 +16,12 @@ const actions: { id: Action; icon: React.ElementType; title: string; description
     icon: Scale,
     title: 'Benchmark Comparison',
     description: 'Check your document against a standard or template.',
+  },
+  {
+    id: 'fallback',
+    icon: Layers,
+    title: 'Fallback Position Assessment',
+    description: 'See where the counterparty contract sits between your standard and fallback positions.',
   },
   {
     id: 'clause',
