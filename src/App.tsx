@@ -5,13 +5,11 @@ import { DefinelySidebar } from '@/components/review/DefinelySidebar'
 import { cn } from '@/lib/utils'
 
 const flows = [
-  { id: 'contract-builder', label: 'Contract Builder' },
-  { id: 'review', label: 'Review' },
-  { id: 'definely-brand', label: 'Definely Brand' },
+  { id: 'definely-brand', label: 'Definely' },
 ]
 
 function App() {
-  const [activeFlow, setActiveFlow] = useState('contract-builder')
+  const [activeFlow, setActiveFlow] = useState('definely-brand')
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden">

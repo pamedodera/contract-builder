@@ -5,12 +5,11 @@ import { Button } from '@/components/ui/button'
 import { ReviewSidebar } from './ReviewSidebar'
 import { DefinelySidebarHome } from './DefinelySidebarHome'
 
-type Tab = 'home' | 'review' | 'enhance' | 'library'
+type Tab = 'home' | 'review' | 'library'
 
 const tabs: { id: Tab; label: string }[] = [
   { id: 'home', label: 'Home' },
   { id: 'review', label: 'Review' },
-  { id: 'enhance', label: 'Enhance' },
   { id: 'library', label: 'Library' },
 ]
 
