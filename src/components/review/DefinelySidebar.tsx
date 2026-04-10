@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
+import { RefreshCw, Settings, Network } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { ReviewSidebar } from './ReviewSidebar'
 import { DefinelySidebarHome } from './DefinelySidebarHome'
 
@@ -19,7 +21,7 @@ export function DefinelySidebar() {
     <div className="brand-theme flex h-full w-1/3 shrink-0 flex-col border-l border-border bg-sidebar">
 
       {/* ── Tab bar ── */}
-      <div className="shrink-0 border-b border-border px-3 py-2 flex gap-1">
+      <div className="shrink-0 border-b border-border px-3 py-2 flex items-center gap-1">
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -34,6 +36,17 @@ export function DefinelySidebar() {
             {tab.label}
           </button>
         ))}
+        <div className="ml-auto flex items-center gap-0.5">
+          <Button variant="ghost" size="icon-sm" aria-label="Cascading effects">
+            <Network className="h-3.5 w-3.5" />
+          </Button>
+          <Button variant="ghost" size="icon-sm" aria-label="Refresh">
+            <RefreshCw className="h-3.5 w-3.5" />
+          </Button>
+          <Button variant="ghost" size="icon-sm" aria-label="Settings">
+            <Settings className="h-3.5 w-3.5" />
+          </Button>
+        </div>
       </div>
 
       {/* ── Tab content ── */}

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowLeft, BookOpen, Loader2, Check, ChevronRight, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, BookOpen, Loader2, Check, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ChatInput } from '@/components/sidebar/ChatInput'
@@ -209,6 +209,7 @@ function AlternativeCard({
   const [insertedTerms, setInsertedTerms] = useState<Set<string>>(new Set())
   const [insertingTerm, setInsertingTerm] = useState<string | null>(null)
   const [undoingTerm, setUndoingTerm] = useState<string | null>(null)
+  const [insertingAll, setInsertingAll] = useState(false)
   const itemLabel = alternative.id.startsWith('def') ? 'definition' : 'clause'
   const undefinedTerms: UndefinedTerm[] = undefinedTermsByAlternative[alternative.id] ?? []
 
@@ -227,6 +228,14 @@ function AlternativeCard({
       setInsertedTerms(new Set())
       onUndo()
     }, 1000)
+  }
+
+  function handleInsertAll() {
+    setInsertingAll(true)
+    setTimeout(() => {
+      setInsertingAll(false)
+      setInsertedTerms(new Set(undefinedTerms.map((t) => t.term)))
+    }, 1800)
   }
 
   function handleInsertTerm(term: string) {
@@ -298,21 +307,36 @@ function AlternativeCard({
         </div>
       </div>
 
-      {/* Undefined terms warning */}
+      {/* Suggested definitions for new terms */}
       {used && undefinedTerms.length > 0 && (
-        <div className="border-t border-amber-200 bg-amber-50 px-3 py-2.5 space-y-2.5">
-          <div className="flex items-center gap-1.5">
-            <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600" />
-            <p className="text-xs font-medium text-amber-700">
-              {undefinedTerms.length} undefined term{undefinedTerms.length !== 1 ? 's' : ''} introduced
+        <div className="border-t border-border bg-muted/30 px-3 py-2.5 space-y-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-medium text-foreground">
+              {undefinedTerms.length} new term{undefinedTerms.length !== 1 ? 's' : ''} — definitions suggested
             </p>
+            {undefinedTerms.length > 1 && (
+              <Button
+                size="sm"
+                variant="secondary"
+                className="h-6 px-2 text-xs shrink-0"
+                disabled={insertingAll || insertedTerms.size === undefinedTerms.length}
+                onClick={handleInsertAll}
+              >
+                {insertingAll
+                  ? <><Loader2 className="h-3 w-3 mr-1.5 animate-spin" />Inserting all…</>
+                  : insertedTerms.size === undefinedTerms.length
+                    ? <><Check className="h-3 w-3 mr-1" />All inserted</>
+                    : 'Insert all definitions'
+                }
+              </Button>
+            )}
           </div>
           <div className="space-y-2">
             {undefinedTerms.map((ut) => (
               <UndefinedTermRow
                 key={ut.term}
                 term={ut}
-                inserted={insertedTerms.has(ut.term)}
+                inserted={insertedTerms.has(ut.term) || insertingAll}
                 inserting={insertingTerm === ut.term}
                 undoing={undoingTerm === ut.term}
                 onInsert={() => handleInsertTerm(ut.term)}
@@ -344,10 +368,10 @@ function UndefinedTermRow({
   const [expanded, setExpanded] = useState(false)
 
   return (
-    <div className="rounded-md border border-amber-200 bg-white overflow-hidden">
+    <div className="rounded-md border border-border bg-card overflow-hidden">
       <button
         onClick={() => setExpanded((v) => !v)}
-        className="w-full flex items-center gap-2 px-2.5 py-2 text-left hover:bg-amber-50/60 transition-colors"
+        className="w-full flex items-center gap-2 px-2.5 py-2 text-left hover:bg-accent transition-colors"
       >
         <span className="flex-1 text-xs font-medium text-foreground">{term.term}</span>
         {term.source === 'ai' ? (
@@ -361,7 +385,7 @@ function UndefinedTermRow({
         )}
       </button>
       {expanded && (
-        <div className="border-t border-amber-100 px-2.5 py-2 space-y-2">
+        <div className="border-t border-border px-2.5 py-2 space-y-2">
           {term.sourceDoc && (
             <p className="text-[10px] text-muted-foreground">From: {term.sourceDoc}</p>
           )}

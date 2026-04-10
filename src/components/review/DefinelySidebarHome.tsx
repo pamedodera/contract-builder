@@ -64,11 +64,11 @@ export function DefinelySidebarHome() {
             className="absolute inset-0 flex flex-col"
           >
             {/* ── Scrollable body ── */}
-            <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-3 min-h-0">
+            <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3 min-h-0">
 
               {/* Hint banner */}
               {!bannerDismissed && (
-                <div className="flex items-center justify-between gap-2 border-t border-b border-blue-200 bg-blue-50 px-4 py-2 -mx-3">
+                <div className="flex items-center justify-between gap-2 border-t border-b border-blue-200 bg-blue-50 px-4 py-2 -mx-3 -mt-3">
                   <p className="text-xs text-blue-700 leading-snug">Double-click any underlined term to get started.</p>
                   <Button
                     variant="ghost"
