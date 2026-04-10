@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { cn } from '@/lib/utils'
-import { RefreshCw, Settings, Network } from 'lucide-react'
+import { RefreshCw, Settings, Network, Loader2, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ReviewSidebar } from './ReviewSidebar'
 import { DefinelySidebarHome } from './DefinelySidebarHome'
 
 type Tab = 'home' | 'review' | 'library'
+type RefreshState = 'idle' | 'loading' | 'done'
 
 const tabs: { id: Tab; label: string }[] = [
   { id: 'home', label: 'Home' },
@@ -13,8 +14,29 @@ const tabs: { id: Tab; label: string }[] = [
   { id: 'library', label: 'Library' },
 ]
 
+function formatDateTime(date: Date) {
+  return date.toLocaleString('en-GB', {
+    day: 'numeric', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  })
+}
+
 export function DefinelySidebar() {
   const [activeTab, setActiveTab] = useState<Tab>('home')
+  const [refreshState, setRefreshState] = useState<RefreshState>('idle')
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
+  const doneTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function handleRefresh() {
+    if (refreshState === 'loading') return
+    if (doneTimerRef.current) clearTimeout(doneTimerRef.current)
+    setRefreshState('loading')
+    setTimeout(() => {
+      setLastUpdated(new Date())
+      setRefreshState('done')
+      doneTimerRef.current = setTimeout(() => setRefreshState('idle'), 1500)
+    }, 1500)
+  }
 
   return (
     <div className="brand-theme flex h-full w-1/3 shrink-0 flex-col border-l border-border bg-sidebar">
@@ -36,13 +58,32 @@ export function DefinelySidebar() {
           </button>
         ))}
         <div className="ml-auto flex items-center gap-0.5">
-          <Button variant="ghost" size="icon-sm" aria-label="Cascading effects">
+          <Button variant="secondary" size="icon-sm" aria-label="Cascading effects">
             <Network className="h-3.5 w-3.5" />
           </Button>
-          <Button variant="ghost" size="icon-sm" aria-label="Refresh">
-            <RefreshCw className="h-3.5 w-3.5" />
-          </Button>
-          <Button variant="ghost" size="icon-sm" aria-label="Settings">
+          <div className="relative group/refresh">
+            <Button
+              variant="secondary"
+              size="icon-sm"
+              aria-label="Refresh"
+              onClick={handleRefresh}
+              disabled={refreshState === 'loading'}
+            >
+              {refreshState === 'loading' && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {refreshState === 'done' && <Check className="h-3.5 w-3.5" />}
+              {refreshState === 'idle' && <RefreshCw className="h-3.5 w-3.5" />}
+            </Button>
+            {refreshState !== 'loading' && (
+              <div className="pointer-events-none absolute bottom-full right-0 mb-1.5 hidden group-hover/refresh:block z-50">
+                <div className="rounded-md bg-popover border border-border px-2.5 py-1.5 shadow-md whitespace-nowrap">
+                  <p className="text-xs text-muted-foreground">
+                    {refreshState === 'done' ? 'Refreshed' : `Last updated: ${formatDateTime(lastUpdated)}`}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+          <Button variant="secondary" size="icon-sm" aria-label="Settings">
             <Settings className="h-3.5 w-3.5" />
           </Button>
         </div>
