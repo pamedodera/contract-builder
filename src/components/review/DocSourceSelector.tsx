@@ -21,7 +21,7 @@ export function DocSourceSelector({ selectedDoc, onDocSelect }: DocSourceSelecto
   return (
     <div className="space-y-2">
       {/* iManage */}
-      <div className="rounded-md border border-border overflow-hidden">
+      <div className="rounded-md border border-border bg-card overflow-hidden">
         <button
           onClick={() => toggle('imanage')}
           className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left hover:bg-accent transition-colors"
@@ -47,7 +47,7 @@ export function DocSourceSelector({ selectedDoc, onDocSelect }: DocSourceSelecto
       </div>
 
       {/* Library */}
-      <div className="rounded-md border border-border overflow-hidden">
+      <div className="rounded-md border border-border bg-card overflow-hidden">
         <button
           onClick={() => toggle('library')}
           className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left hover:bg-accent transition-colors"
@@ -73,7 +73,7 @@ export function DocSourceSelector({ selectedDoc, onDocSelect }: DocSourceSelecto
       </div>
 
       {/* Upload — always expanded */}
-      <div className="rounded-md border border-border overflow-hidden">
+      <div className="rounded-md border border-border bg-card overflow-hidden">
         <div className="flex items-center gap-2.5 px-3 py-2.5 border-b border-border">
           <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
           <span className="text-sm font-medium">Upload</span>

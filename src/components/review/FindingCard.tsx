@@ -10,6 +10,7 @@ interface FindingCardProps {
   defaultOpen?: boolean
   isInserted?: boolean
   onInserted?: () => void
+  onUndoInserted?: () => void
   selectedAction?: string | null
   onActionSelect?: (actionId: string | null) => void
   showValidation?: boolean
@@ -28,11 +29,12 @@ const trafficLightConfig = {
   low: { label: 'Within Standard', className: 'text-green-600 border-green-300 bg-green-50' },
 }
 
-export function FindingCard({ finding, defaultOpen = false, isInserted = false, onInserted, selectedAction: controlledAction, onActionSelect, showValidation = false, trafficLight = false }: FindingCardProps) {
+export function FindingCard({ finding, defaultOpen = false, isInserted = false, onInserted, onUndoInserted, selectedAction: controlledAction, onActionSelect, showValidation = false, trafficLight = false }: FindingCardProps) {
   const [open, setOpen] = useState(defaultOpen)
   const [internalAction, setInternalAction] = useState<string | null>(null)
   const [insertingId, setInsertingId] = useState<string | null>(null)
   const [insertedActionId, setInsertedActionId] = useState<string | null>(null)
+  const [undoing, setUndoing] = useState(false)
   const config = trafficLight ? trafficLightConfig[finding.severity] : severityConfig[finding.severity]
   const hasActions = finding.actions && finding.actions.length > 0
 
@@ -49,6 +51,14 @@ export function FindingCard({ finding, defaultOpen = false, isInserted = false, 
       setInsertedActionId(actionId)
       onInserted?.()
     }, 1500)
+  }
+
+  function handleUndo() {
+    setUndoing(true)
+    setTimeout(() => {
+      setInsertedActionId(null)
+      onUndoInserted?.()
+    }, 1000)
   }
 
   const needsResolution = showValidation && !isInserted && !selectedAction && hasActions
@@ -137,6 +147,26 @@ export function FindingCard({ finding, defaultOpen = false, isInserted = false, 
       {needsResolution && !open && (
         <div className="border-t border-amber-200 bg-amber-50/60 px-3 py-1.5">
           <p className="text-xs text-amber-600">Select a resolution to insert changes.</p>
+        </div>
+      )}
+      {isInserted && (
+        <div className="border-t border-green-100 bg-green-50/40 px-3 py-1.5 flex items-center justify-between">
+          <span className="flex items-center gap-1.5 text-xs font-medium text-green-600">
+            {undoing
+              ? <Loader2 className="h-3 w-3 animate-spin" />
+              : <Check className="h-3 w-3" />}
+            {undoing ? 'Undoing…' : 'Fix inserted'}
+          </span>
+          {!undoing && onUndoInserted && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs text-muted-foreground"
+              onClick={handleUndo}
+            >
+              Undo
+            </Button>
+          )}
         </div>
       )}
     </div>
