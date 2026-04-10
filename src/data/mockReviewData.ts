@@ -314,3 +314,105 @@ export const coverageFindings: Finding[] = [
     detail: 'The document includes a mutual confidentiality clause covering both parties\' obligations. The definition of confidential information is reasonably broad, and the clause includes standard carve-outs for publicly available information and legally compelled disclosure. Post-termination survival period is two years, which is on the shorter end for sensitive arrangements.',
   },
 ]
+
+// Used by Proof Issues (document consistency and proofing errors)
+export const proofFindings: Finding[] = [
+  {
+    id: 'pf1', areaId: 'defined-terms', areaLabel: 'Undefined Term', severity: 'high',
+    summary: '"Services" used in clause 3.1 but only defined in Schedule 1, which is not yet attached.',
+    detail: 'Clause 3.1 relies on the defined term "Services" but the definition appears exclusively in Schedule 1. Schedule 1 is referenced but not currently attached to the document. Any ambiguity about the scope of Services creates a significant risk that the clause is unenforceable as drafted.',
+    actions: [
+      { id: 'pf1a', label: 'Insert inline definition of "Services" in clause 1 (Definitions)' },
+      { id: 'pf1b', label: 'Add a placeholder Schedule 1 with a provisional scope of services' },
+    ],
+  },
+  {
+    id: 'pf2', areaId: 'cross-references', areaLabel: 'Broken Cross-Reference', severity: 'high',
+    summary: 'Clause 8.2 references "clause 7.4" which does not exist — likely should be clause 7.3.',
+    detail: 'The indemnity clause at 8.2 directs the reader to "clause 7.4 (Liability Cap)" but there is no clause 7.4 in this document. The liability cap appears at clause 7.3. This is likely a drafting error introduced during a renumbering. A broken cross-reference in an indemnity clause creates material ambiguity.',
+    actions: [
+      { id: 'pf2a', label: 'Update clause 8.2 cross-reference to clause 7.3' },
+    ],
+  },
+  {
+    id: 'pf3', areaId: 'party-names', areaLabel: 'Inconsistent Party Name', severity: 'medium',
+    summary: '"the Supplier" used in clause 2 but defined as "Service Provider" throughout the rest of the agreement.',
+    detail: 'The defined term for the supplying party is "Service Provider" as set out in the opening recitals and used consistently in clauses 4 through 14. Clause 2 reverts to the informal "the Supplier" without definition. Courts will generally infer the meaning, but the inconsistency may cause confusion and should be corrected for professional presentation.',
+    actions: [
+      { id: 'pf3a', label: 'Replace "the Supplier" in clause 2 with "Service Provider"' },
+    ],
+  },
+  {
+    id: 'pf4', areaId: 'schedules', areaLabel: 'Missing Schedule', severity: 'medium',
+    summary: 'Exhibit A is referenced in clause 12.1 but has not been attached to the document.',
+    detail: 'Clause 12.1 (Data Processing) incorporates Exhibit A (Data Processing Addendum) by reference. No Exhibit A is currently attached. For GDPR compliance purposes, the Data Processing Addendum is a mandatory document where personal data is being processed under the agreement. The agreement should not be signed without it.',
+    actions: [
+      { id: 'pf4a', label: 'Insert standard Data Processing Addendum as Exhibit A' },
+      { id: 'pf4b', label: 'Add a placeholder Exhibit A with a note to complete before signing' },
+    ],
+  },
+  {
+    id: 'pf5', areaId: 'dates', areaLabel: 'Date Inconsistency', severity: 'low',
+    summary: 'Effective Date is 1 January 2024 in the recitals but 1 February 2024 in the signature block.',
+    detail: 'The recitals state the agreement is entered into as of 1 January 2024. The signature block dates the agreement 1 February 2024. The inconsistency should be resolved — the signature block date typically governs where there is a conflict, but the discrepancy could create uncertainty about when obligations commenced.',
+    actions: [
+      { id: 'pf5a', label: 'Align recitals to match signature block date (1 February 2024)' },
+      { id: 'pf5b', label: 'Align signature block to match recitals date (1 January 2024)' },
+    ],
+  },
+  {
+    id: 'pf6', areaId: 'numbering', areaLabel: 'Clause Numbering Gap', severity: 'low',
+    summary: 'Clause numbering skips from 5.3 to 5.5 — clause 5.4 appears to have been deleted without renumbering.',
+    detail: 'The document jumps from clause 5.3 to clause 5.5 with no clause 5.4 present. This suggests a clause was removed during drafting but the numbering was not updated. While not legally significant, it creates a professional presentation issue and may prompt questions from the counterparty during negotiation.',
+    actions: [
+      { id: 'pf6a', label: 'Renumber clauses 5.5 onwards to remove the gap' },
+    ],
+  },
+]
+
+// Used by Cascade Issues (changes with knock-on effects in other clauses)
+export const cascadeFindings: Finding[] = [
+  {
+    id: 'cf1', areaId: 'party-names', areaLabel: 'Party Name Change', severity: 'high',
+    summary: 'Renaming "Acme Ltd" to "Acme Corporation Ltd" affects 23 instances across 9 clauses.',
+    detail: 'The counterparty has requested that references to "Acme Ltd" be updated to reflect their new legal name "Acme Corporation Ltd" following a corporate restructure. This change affects 23 instances across clauses 1, 3, 5, 6, 8, 9, 11, 12, and the signature block. A global find-and-replace is required. Care should be taken to confirm the new registered name matches Companies House records exactly.',
+    actions: [
+      { id: 'cf1a', label: 'Apply global rename to "Acme Corporation Ltd" across all 23 instances' },
+    ],
+  },
+  {
+    id: 'cf2', areaId: 'liability-cap', areaLabel: 'Liability Cap Conflict', severity: 'high',
+    summary: 'Reducing the liability cap to £500k conflicts with the minimum insurance requirement of £1m in clause 9.2.',
+    detail: 'The proposed reduction of the aggregate liability cap from £1,000,000 to £500,000 creates an internal inconsistency with clause 9.2, which requires each party to maintain professional indemnity insurance of not less than £1,000,000 per claim. The insurance floor exceeds the liability ceiling, which undermines the commercial logic of the cap. Both provisions should be reviewed together.',
+    actions: [
+      { id: 'cf2a', label: 'Reduce insurance requirement in clause 9.2 to match £500k cap' },
+      { id: 'cf2b', label: 'Restore liability cap to £1m to match insurance requirement' },
+    ],
+  },
+  {
+    id: 'cf3', areaId: 'payment-terms', areaLabel: 'Payment Term Cascade', severity: 'medium',
+    summary: 'Extending payment terms to 45 days requires a corresponding update to the late interest clause at 6.4.',
+    detail: 'Clause 6.4 calculates late payment interest by reference to invoices unpaid "after 30 days from the date of invoice". Extending the payment period to 45 days in clause 6.1 without updating clause 6.4 means interest would begin accruing 15 days before payment is formally overdue, creating a contradiction. Clause 6.4 should be updated to reference 45 days to maintain internal consistency.',
+    actions: [
+      { id: 'cf3a', label: 'Update clause 6.4 late interest trigger to 45 days' },
+    ],
+  },
+  {
+    id: 'cf4', areaId: 'confidentiality', areaLabel: 'Confidentiality Period Conflict', severity: 'medium',
+    summary: 'Extending confidentiality to 5 years conflicts with a 2-year employee obligation cap in Schedule 2.',
+    detail: 'The proposed extension of post-termination confidentiality obligations from 2 to 5 years in clause 10.3 creates an inconsistency with Schedule 2 (Employee Obligations), which caps individual employee confidentiality obligations at 2 years to comply with employment law guidance on restrictive covenants. If the main body obligation is extended, Schedule 2 must be reviewed by employment counsel before finalisation.',
+    actions: [
+      { id: 'cf4a', label: 'Update Schedule 2 to align with 5-year post-termination period' },
+      { id: 'cf4b', label: 'Retain 2-year period in clause 10.3 to match Schedule 2' },
+    ],
+  },
+  {
+    id: 'cf5', areaId: 'governing-law', areaLabel: 'Governing Law Cascade', severity: 'low',
+    summary: 'Changing governing law to New York conflicts with the arbitration clause referencing the English Arbitration Act 1996.',
+    detail: 'The arbitration clause at clause 14.2 specifies that any arbitral proceedings shall be conducted in accordance with the English Arbitration Act 1996. If governing law is changed to New York, the procedural law of arbitration should be updated to reference the Federal Arbitration Act or the New York CPLR. This is a procedural inconsistency that could complicate enforcement of any award.',
+    actions: [
+      { id: 'cf5a', label: 'Update arbitration clause to reference Federal Arbitration Act' },
+      { id: 'cf5b', label: 'Retain English governing law and remove New York change' },
+    ],
+  },
+]
