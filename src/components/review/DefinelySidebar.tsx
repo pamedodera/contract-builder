@@ -74,7 +74,7 @@ export function DefinelySidebar() {
               {refreshState === 'idle' && <RefreshCw className="h-3.5 w-3.5" />}
             </Button>
             {refreshState !== 'loading' && (
-              <div className="pointer-events-none absolute bottom-full right-0 mb-1.5 hidden group-hover/refresh:block z-50">
+              <div className="pointer-events-none absolute top-full right-0 mt-1.5 hidden group-hover/refresh:block z-50">
                 <div className="rounded-md bg-popover border border-border px-2.5 py-1.5 shadow-md whitespace-nowrap">
                   <p className="text-xs text-muted-foreground">
                     {refreshState === 'done' ? 'Refreshed' : `Last updated: ${formatDateTime(lastUpdated)}`}
