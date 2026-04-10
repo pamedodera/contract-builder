@@ -180,7 +180,7 @@ function renderBlock(block: DocumentBlock, onTermClick?: (termId: string) => voi
 export function DocumentViewer({ onTermClick }: DocumentViewerProps) {
   return (
     <div className="w-full h-full overflow-y-auto bg-muted/30">
-      <div className="max-w-2xl mx-auto my-10 px-14 py-12 bg-card shadow-sm">
+      <div className="mx-3 my-3 px-12 py-8 bg-card shadow-sm">
         <div className="mb-6 flex items-center justify-between">
           <p className="text-xs text-muted-foreground">Ref: {mockDocument.ref}</p>
           <p className="text-xs text-muted-foreground">CONFIDENTIAL</p>
