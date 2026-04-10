@@ -58,9 +58,6 @@ export function DefinelySidebar() {
           </button>
         ))}
         <div className="ml-auto flex items-center gap-0.5">
-          <Button variant="secondary" size="icon-sm" aria-label="Cascading effects">
-            <Network className="h-3.5 w-3.5" />
-          </Button>
           <div className="relative group/refresh">
             <Button
               variant="secondary"
@@ -83,6 +80,9 @@ export function DefinelySidebar() {
               </div>
             )}
           </div>
+          <Button variant="secondary" size="icon-sm" aria-label="Cascading effects">
+            <Network className="h-3.5 w-3.5" />
+          </Button>
           <Button variant="secondary" size="icon-sm" aria-label="Settings">
             <Settings className="h-3.5 w-3.5" />
           </Button>
