@@ -105,20 +105,20 @@ export const comparisonAreas: ComparisonArea[] = [
 export const mockFindings: Finding[] = [
   {
     id: 'f1', areaId: 'payment-terms', areaLabel: 'Payment Terms', severity: 'high',
-    summary: 'Your draft uses 30-day payment terms; the precedent specifies 14 days with a 2% late fee.',
-    detail: 'The precedent document sets a 14-day payment cycle with an automatic 2% per month late payment fee. Your current draft does not include a late payment mechanism. This gap could significantly delay cash flow and leave you without a contractual remedy for late payment. Recommend tightening the payment schedule and adding a late payment clause.',
+    summary: 'Your draft uses 30-day payment terms; the precedent specifies 14 days.',
+    detail: 'The precedent document sets a 14-day payment cycle. Your current draft allows 30 days, which is slower than market practice for professional services agreements and could delay cash flow. Both drafts include a 2% per month late payment remedy, so only the payment window needs to be negotiated.',
     actions: [
-      { id: 'a1a', label: 'Adopt 14-day cycle with 2% monthly late fee (mirror precedent)' },
-      { id: 'a1b', label: 'Keep 30-day terms and add a late payment remedy clause' },
+      { id: 'a1a', label: 'Shorten to 14-day payment cycle (mirror precedent)' },
+      { id: 'a1b', label: 'Keep 30-day terms — acceptable given the existing late payment remedy' },
     ],
   },
   {
     id: 'f2', areaId: 'liability-cap', areaLabel: 'Liability Cap', severity: 'high',
-    summary: 'Liability cap in your draft is uncapped; precedent caps at 12 months\' fees.',
-    detail: 'The precedent document limits aggregate liability to the total fees paid in the 12 months preceding the claim. Your draft contains no cap on liability, exposing your client to unlimited claims. This is a significant commercial risk. Strong recommendation to introduce a mutual liability cap mirroring the precedent.',
+    summary: 'Your liability cap is 12 months\' fees; precedent uses 2× annual contract value.',
+    detail: 'Your draft caps aggregate liability at the total fees paid in the 12 months preceding the claim. The precedent uses a cap of two times the annual contract value, which provides broader protection in longer-term or high-value engagements where fees paid to date may be low relative to the exposure. Consider whether the 12-month lookback adequately covers your risk profile.',
     actions: [
-      { id: 'a2a', label: 'Cap at 12 months\' fees (mirror precedent)' },
-      { id: 'a2b', label: 'Introduce alternative cap at 2× annual contract value' },
+      { id: 'a2a', label: 'Increase cap to 2× annual contract value (mirror precedent)' },
+      { id: 'a2b', label: 'Retain 12-month fees cap — acceptable for shorter engagements' },
     ],
   },
   {
@@ -137,11 +137,11 @@ export const mockFindings: Finding[] = [
   },
   {
     id: 'f5', areaId: 'ip-ownership', areaLabel: 'IP Ownership', severity: 'medium',
-    summary: 'Precedent includes a broad IP assignment; your draft is silent on background IP.',
-    detail: 'The precedent document includes an explicit assignment of all foreground IP created under the contract and addresses background IP licences. Your draft does not distinguish between background and foreground IP, which creates ambiguity about what the client owns at the end of the engagement. Recommend adding an IP schedule.',
+    summary: 'IP assignment in your draft is conditional on full payment; precedent assigns on creation.',
+    detail: 'Your draft assigns intellectual property rights in the Working Materials to the Client "subject to payment in full of all Fees due." The precedent assigns IP on creation unconditionally, reducing the risk of disputes about ownership during the engagement. A conditional assignment could leave the Client without clear title to deliverables if a payment dispute arises mid-project.',
     actions: [
-      { id: 'a5a', label: 'Add IP schedule distinguishing foreground and background rights' },
-      { id: 'a5b', label: 'Add a simple broad assignment clause for all created IP' },
+      { id: 'a5a', label: 'Remove the payment condition — assign IP on creation (mirror precedent)' },
+      { id: 'a5b', label: 'Keep payment condition but add an interim licence pending full payment' },
     ],
   },
   {
@@ -155,16 +155,16 @@ export const mockFindings: Finding[] = [
   },
   {
     id: 'f7', areaId: 'force-majeure', areaLabel: 'Force Majeure', severity: 'low',
-    summary: 'Precedent includes pandemic and supply chain events; your draft uses a narrower definition.',
-    detail: 'Post-pandemic drafting standards include explicit references to public health emergencies, government-mandated closures, and supply chain disruptions as force majeure events. Your draft uses a generic "events beyond reasonable control" formulation. Recommend updating to the expanded list from the precedent to avoid disputes about scope.',
+    summary: 'Force majeure definitions are aligned; both include pandemic and supply chain events.',
+    detail: 'Both your draft and the precedent explicitly include public health emergencies, pandemic events, and supply chain disruptions in the force majeure definition. The definitions are substantively equivalent. One minor difference: the precedent includes "cyber incidents and IT infrastructure failure" as a named trigger, which your draft does not. This is worth considering for technology-dependent engagements.',
   },
   {
     id: 'f8', areaId: 'dispute-resolution', areaLabel: 'Dispute Resolution', severity: 'medium',
-    summary: 'Precedent requires ICC arbitration; your draft defaults to court litigation.',
-    detail: 'The precedent specifies ICC arbitration in London as the mandatory dispute resolution mechanism, with a three-member tribunal for disputes above £500k. Your draft is silent on dispute resolution, which defaults to court litigation. For international counterparties, arbitration is generally preferred for enforceability under the New York Convention.',
+    summary: 'Your draft uses LCIA arbitration; the precedent specifies ICC — both are valid but diverge.',
+    detail: 'Your draft specifies LCIA arbitration in London, while the precedent uses ICC arbitration. Both are internationally recognised, but ICC awards are generally considered to have stronger global enforceability under the New York Convention and may be preferred if the counterparty operates across multiple jurisdictions. The arbitrator tier thresholds (sole arbitrator below £500k, three-member panel above) are consistent between both drafts.',
     actions: [
-      { id: 'a8a', label: 'Insert ICC arbitration clause with 3-member panel for disputes above £500k' },
-      { id: 'a8b', label: 'Keep court litigation and add a mandatory mediation step' },
+      { id: 'a8a', label: 'Switch to ICC arbitration (mirror precedent — broader international enforceability)' },
+      { id: 'a8b', label: 'Retain LCIA — preferred for London-seated disputes between UK-based parties' },
     ],
   },
 ]
@@ -272,31 +272,19 @@ export const fallbackFindings: Finding[] = [
 // Used by Coverage & Completeness
 export const coverageFindings: Finding[] = [
   {
-    id: 'c1', areaId: 'dispute-resolution', areaLabel: 'Dispute Resolution', severity: 'high',
-    summary: 'No dispute resolution mechanism found in the document.',
-    detail: 'The document contains no clause specifying how disputes between the parties should be resolved. Without an express mechanism, parties default to court litigation, which may be slower and more expensive than arbitration or mediation. A dispute resolution clause is strongly recommended for any commercial agreement.',
-    actions: [
-      { id: 'c1a', label: 'Insert ICC arbitration clause (London seat)' },
-      { id: 'c1b', label: 'Add exclusive English court jurisdiction clause' },
-    ],
+    id: 'c1', areaId: 'dispute-resolution', areaLabel: 'Dispute Resolution', severity: 'low',
+    summary: 'LCIA arbitration clause present — well-drafted with tiered tribunal provisions.',
+    detail: 'The document includes a comprehensive dispute resolution clause (clause 10) providing for a mandatory senior representative negotiation phase (20 Business Days) before referral to LCIA arbitration. The clause correctly tiers the tribunal by dispute value: sole arbitrator below £500,000 and a three-member panel above. The seat and language are both specified. No gaps identified.',
   },
   {
-    id: 'c2', areaId: 'ip-ownership', areaLabel: 'IP Ownership', severity: 'high',
-    summary: 'IP ownership clause is absent; essential for technology and services agreements.',
-    detail: 'The document does not address the ownership of intellectual property created under the agreement. This creates significant ambiguity about who owns deliverables, work product, or any software developed during the engagement. An IP clause covering both foreground and background rights is strongly recommended.',
-    actions: [
-      { id: 'c2a', label: 'Add IP schedule with foreground and background rights split' },
-      { id: 'c2b', label: 'Add a simple work-for-hire assignment of all created IP' },
-    ],
+    id: 'c2', areaId: 'ip-ownership', areaLabel: 'IP Ownership', severity: 'low',
+    summary: 'IP ownership comprehensively covered — foreground assignment and background IP licence both present.',
+    detail: 'Clause 4 addresses IP ownership in full. Working Materials (foreground IP) are assigned to the Client upon payment in full (clause 4.1). Pre-existing IP is retained by the Service Provider, with a non-exclusive royalty-free irrevocable licence granted to the Client to the extent needed to use the deliverables (clause 4.2). Both parties give IP warranties at clause 4.4. No gaps identified.',
   },
   {
-    id: 'c3', areaId: 'force-majeure', areaLabel: 'Force Majeure', severity: 'medium',
-    summary: 'Force majeure clause present but limited — does not cover public health emergencies.',
-    detail: 'The document includes a force majeure clause using a generic "events beyond reasonable control" formulation. Post-pandemic market practice now typically includes explicit reference to public health emergencies, government-mandated closures, and supply chain disruptions. The current drafting may be insufficient to cover these scenarios.',
-    actions: [
-      { id: 'c3a', label: 'Update to include public health emergencies and supply chain disruptions' },
-      { id: 'c3b', label: 'Keep current generic formulation with a non-exhaustive list added' },
-    ],
+    id: 'c3', areaId: 'force-majeure', areaLabel: 'Force Majeure', severity: 'low',
+    summary: 'Force majeure clause present with modern broad definition including pandemic and supply chain events.',
+    detail: 'The force majeure definition in clause 1 explicitly includes acts of God, fire, flood, earthquake, governmental action, public health emergencies, pandemic, epidemic, and supply chain disruption. This reflects post-pandemic market practice. Clause 7 also includes notification obligations, a mitigation duty, and a 90-day termination right. No gaps identified.',
   },
   {
     id: 'c4', areaId: 'payment-terms', areaLabel: 'Payment Terms', severity: 'low',
@@ -318,55 +306,54 @@ export const coverageFindings: Finding[] = [
 // Used by Proof Issues (document consistency and proofing errors)
 export const proofFindings: Finding[] = [
   {
-    id: 'pf1', areaId: 'defined-terms', areaLabel: 'Undefined Term', severity: 'high',
-    summary: '"Services" used in clause 3.1 but only defined in Schedule 1, which is not yet attached.',
-    detail: 'Clause 3.1 relies on the defined term "Services" but the definition appears exclusively in Schedule 1. Schedule 1 is referenced but not currently attached to the document. Any ambiguity about the scope of Services creates a significant risk that the clause is unenforceable as drafted.',
+    id: 'pf1', areaId: 'schedules', areaLabel: 'Missing Schedule', severity: 'high',
+    summary: 'Schedule 1 (scope of Services) is referenced in the definitions but not yet attached.',
+    detail: 'The definition of "Services" in clause 1 and the definition of "Working Materials" both refer to Schedule 1 as the document setting out the scope of services. Schedule 1 is not currently attached. Without it, the scope of the Service Provider\'s obligations is undefined, rendering the agreement commercially incomplete and potentially unenforceable as to its core subject matter.',
     actions: [
-      { id: 'pf1a', label: 'Insert inline definition of "Services" in clause 1 (Definitions)' },
-      { id: 'pf1b', label: 'Add a placeholder Schedule 1 with a provisional scope of services' },
+      { id: 'pf1a', label: 'Attach a completed Schedule 1 defining the scope of Services' },
+      { id: 'pf1b', label: 'Add a placeholder Schedule 1 with a note to complete before signing' },
     ],
   },
   {
-    id: 'pf2', areaId: 'cross-references', areaLabel: 'Broken Cross-Reference', severity: 'high',
-    summary: 'Clause 8.2 references "clause 7.4" which does not exist — likely should be clause 7.3.',
-    detail: 'The indemnity clause at 8.2 directs the reader to "clause 7.4 (Liability Cap)" but there is no clause 7.4 in this document. The liability cap appears at clause 7.3. This is likely a drafting error introduced during a renumbering. A broken cross-reference in an indemnity clause creates material ambiguity.',
+    id: 'pf2', areaId: 'schedules', areaLabel: 'Missing Schedule', severity: 'high',
+    summary: 'Schedule 2 (Fees) is referenced in the definitions but has not been attached.',
+    detail: 'The definition of "Fees" in clause 1 states that fees are "as set out in Schedule 2." Schedule 2 is not currently attached to the document. Without it, the Client\'s payment obligation lacks a defined amount, making clause 3 (Fees and Payment) unenforceable. The agreement should not be executed until Schedule 2 is completed and attached.',
     actions: [
-      { id: 'pf2a', label: 'Update clause 8.2 cross-reference to clause 7.3' },
+      { id: 'pf2a', label: 'Attach a completed Schedule 2 setting out the Fees' },
+      { id: 'pf2b', label: 'Add a placeholder Schedule 2 with a note to complete before signing' },
     ],
   },
   {
-    id: 'pf3', areaId: 'party-names', areaLabel: 'Inconsistent Party Name', severity: 'medium',
-    summary: '"the Supplier" used in clause 2 but defined as "Service Provider" throughout the rest of the agreement.',
-    detail: 'The defined term for the supplying party is "Service Provider" as set out in the opening recitals and used consistently in clauses 4 through 14. Clause 2 reverts to the informal "the Supplier" without definition. Courts will generally infer the meaning, but the inconsistency may cause confusion and should be corrected for professional presentation.',
+    id: 'pf3', areaId: 'cross-references', areaLabel: 'Broken Cross-Reference', severity: 'medium',
+    summary: 'Clause 8.3 lists surviving clauses as "4, 5, 6, 9, and 10" — clause 7 (Force Majeure) is omitted.',
+    detail: 'Clause 8.3(b) specifies that clauses 4, 5, 6, 9, and 10 survive termination. It is likely that clause 7 (Force Majeure) was also intended to survive, as the 90-day termination right in clause 7.3 arises precisely in the context of the agreement ending. The omission of clause 7 from the survival list may be a drafting oversight.',
     actions: [
-      { id: 'pf3a', label: 'Replace "the Supplier" in clause 2 with "Service Provider"' },
+      { id: 'pf3a', label: 'Add clause 7 to the survival list in clause 8.3(b)' },
+      { id: 'pf3b', label: 'Confirm clause 7 intentionally excluded from survival — leave as is' },
     ],
   },
   {
-    id: 'pf4', areaId: 'schedules', areaLabel: 'Missing Schedule', severity: 'medium',
-    summary: 'Exhibit A is referenced in clause 12.1 but has not been attached to the document.',
-    detail: 'Clause 12.1 (Data Processing) incorporates Exhibit A (Data Processing Addendum) by reference. No Exhibit A is currently attached. For GDPR compliance purposes, the Data Processing Addendum is a mandatory document where personal data is being processed under the agreement. The agreement should not be signed without it.',
+    id: 'pf4', areaId: 'party-names', areaLabel: 'Inconsistent Party Reference', severity: 'medium',
+    summary: 'Clause 4.2 uses "Pre-existing IP" without defining it in clause 1 (Definitions).',
+    detail: 'Clause 4.2 introduces and uses the term "Pre-existing IP" as a defined term (it appears in quotation marks), but no definition of "Pre-existing IP" appears in clause 1 (Definitions). The term is explained descriptively in clause 4.2 itself, but for consistency and to avoid ambiguity, it should be added to the definitions section.',
     actions: [
-      { id: 'pf4a', label: 'Insert standard Data Processing Addendum as Exhibit A' },
-      { id: 'pf4b', label: 'Add a placeholder Exhibit A with a note to complete before signing' },
+      { id: 'pf4a', label: 'Add "Pre-existing IP" as a defined term in clause 1 (Definitions)' },
+      { id: 'pf4b', label: 'Remove quotation marks from "Pre-existing IP" in clause 4.2 to treat as descriptive, not defined' },
     ],
   },
   {
-    id: 'pf5', areaId: 'dates', areaLabel: 'Date Inconsistency', severity: 'low',
-    summary: 'Effective Date is 1 January 2024 in the recitals but 1 February 2024 in the signature block.',
-    detail: 'The recitals state the agreement is entered into as of 1 January 2024. The signature block dates the agreement 1 February 2024. The inconsistency should be resolved — the signature block date typically governs where there is a conflict, but the discrepancy could create uncertainty about when obligations commenced.',
+    id: 'pf5', areaId: 'dates', areaLabel: 'Date Placeholder', severity: 'low',
+    summary: 'The agreement date is stated as 1 April 2024 but the signature block fields are blank.',
+    detail: 'The parties block sets the date of the agreement as 1 April 2024. The signature block does not yet contain executed signatures or countersigned dates. If the agreement is signed on a date different from 1 April 2024, the date in the parties block should be updated to match the actual date of execution to avoid any uncertainty about when the agreement became binding.',
     actions: [
-      { id: 'pf5a', label: 'Align recitals to match signature block date (1 February 2024)' },
-      { id: 'pf5b', label: 'Align signature block to match recitals date (1 January 2024)' },
+      { id: 'pf5a', label: 'Update the parties block date to match the actual execution date' },
+      { id: 'pf5b', label: 'Confirm 1 April 2024 as the agreed commencement date and retain' },
     ],
   },
   {
-    id: 'pf6', areaId: 'numbering', areaLabel: 'Clause Numbering Gap', severity: 'low',
-    summary: 'Clause numbering skips from 5.3 to 5.5 — clause 5.4 appears to have been deleted without renumbering.',
-    detail: 'The document jumps from clause 5.3 to clause 5.5 with no clause 5.4 present. This suggests a clause was removed during drafting but the numbering was not updated. While not legally significant, it creates a professional presentation issue and may prompt questions from the counterparty during negotiation.',
-    actions: [
-      { id: 'pf6a', label: 'Renumber clauses 5.5 onwards to remove the gap' },
-    ],
+    id: 'pf6', areaId: 'numbering', areaLabel: 'Defined Term Mismatch', severity: 'low',
+    summary: '"Nexus Advisory Partners" used informally in the background recitals without defined term capitalisation.',
+    detail: 'The background recital A refers to "the Service Provider" in full, but recital B uses "the Services" correctly capitalised. However, the parties block defines the supplying party as "Nexus Advisory Partners LLP" with the defined label "the Service Provider". The recitals are consistent, but a reviewer may note that the short-form "Nexus Advisory Partners" appears uncapitalised in some email correspondence attached to the file.',
   },
 ]
 
@@ -374,45 +361,45 @@ export const proofFindings: Finding[] = [
 export const cascadeFindings: Finding[] = [
   {
     id: 'cf1', areaId: 'party-names', areaLabel: 'Party Name Change', severity: 'high',
-    summary: 'Renaming "Acme Ltd" to "Acme Corporation Ltd" affects 23 instances across 9 clauses.',
-    detail: 'The counterparty has requested that references to "Acme Ltd" be updated to reflect their new legal name "Acme Corporation Ltd" following a corporate restructure. This change affects 23 instances across clauses 1, 3, 5, 6, 8, 9, 11, 12, and the signature block. A global find-and-replace is required. Care should be taken to confirm the new registered name matches Companies House records exactly.',
+    summary: 'Renaming "Nexus Advisory Partners LLP" to "Nexus Advisory Group LLP" affects 18 instances across 8 sections.',
+    detail: 'The Service Provider has notified that their firm has rebranded from "Nexus Advisory Partners LLP" to "Nexus Advisory Group LLP" following a merger. This change affects 18 instances across the parties block, recitals, clauses 4, 5, 8, 11, the definitions section, and the signature block. A global find-and-replace is required. The new registered name should be verified against Companies House records before the amendment is executed.',
     actions: [
-      { id: 'cf1a', label: 'Apply global rename to "Acme Corporation Ltd" across all 23 instances' },
+      { id: 'cf1a', label: 'Apply global rename to "Nexus Advisory Group LLP" across all 18 instances' },
     ],
   },
   {
-    id: 'cf2', areaId: 'liability-cap', areaLabel: 'Liability Cap Conflict', severity: 'high',
-    summary: 'Reducing the liability cap to £500k conflicts with the minimum insurance requirement of £1m in clause 9.2.',
-    detail: 'The proposed reduction of the aggregate liability cap from £1,000,000 to £500,000 creates an internal inconsistency with clause 9.2, which requires each party to maintain professional indemnity insurance of not less than £1,000,000 per claim. The insurance floor exceeds the liability ceiling, which undermines the commercial logic of the cap. Both provisions should be reviewed together.',
+    id: 'cf2', areaId: 'liability-cap', areaLabel: 'Liability Cap Cascade', severity: 'high',
+    summary: 'Changing the liability cap from 12 months\' fees to a fixed £250k conflicts with the risk profile in clause 4.1.',
+    detail: 'A proposed amendment would replace the rolling 12-month fees cap in clause 6.2 with a fixed £250,000 ceiling. This creates an internal inconsistency with clause 4.1, which assigns all intellectual property in the Working Materials to the Client. If a deliverable causes significant loss, a £250,000 cap may be materially below the value of IP assigned. Both provisions should be reviewed together to ensure the commercial logic is preserved.',
     actions: [
-      { id: 'cf2a', label: 'Reduce insurance requirement in clause 9.2 to match £500k cap' },
-      { id: 'cf2b', label: 'Restore liability cap to £1m to match insurance requirement' },
+      { id: 'cf2a', label: 'Retain the 12-month rolling fees cap — proportionate to engagement value' },
+      { id: 'cf2b', label: 'Adopt £250k fixed cap but add an IP carve-out for high-value deliverables' },
     ],
   },
   {
     id: 'cf3', areaId: 'payment-terms', areaLabel: 'Payment Term Cascade', severity: 'medium',
-    summary: 'Extending payment terms to 45 days requires a corresponding update to the late interest clause at 6.4.',
-    detail: 'Clause 6.4 calculates late payment interest by reference to invoices unpaid "after 30 days from the date of invoice". Extending the payment period to 45 days in clause 6.1 without updating clause 6.4 means interest would begin accruing 15 days before payment is formally overdue, creating a contradiction. Clause 6.4 should be updated to reference 45 days to maintain internal consistency.',
+    summary: 'Extending payment terms to 45 days requires updating the late interest trigger in clause 3.3.',
+    detail: 'Clause 3.3 calculates late payment interest from "the Payment Due Date" which is defined in clause 3.1 as 30 days from invoice. Extending the payment period to 45 days in clause 3.1 without updating the defined "Payment Due Date" in clause 3.3 would mean interest begins accruing on day 30, a full 15 days before payment is formally overdue. Clause 3.3 must be updated in tandem.',
     actions: [
-      { id: 'cf3a', label: 'Update clause 6.4 late interest trigger to 45 days' },
+      { id: 'cf3a', label: 'Update clause 3.3 Payment Due Date reference to 45 days' },
     ],
   },
   {
     id: 'cf4', areaId: 'confidentiality', areaLabel: 'Confidentiality Period Conflict', severity: 'medium',
-    summary: 'Extending confidentiality to 5 years conflicts with a 2-year employee obligation cap in Schedule 2.',
-    detail: 'The proposed extension of post-termination confidentiality obligations from 2 to 5 years in clause 10.3 creates an inconsistency with Schedule 2 (Employee Obligations), which caps individual employee confidentiality obligations at 2 years to comply with employment law guidance on restrictive covenants. If the main body obligation is extended, Schedule 2 must be reviewed by employment counsel before finalisation.',
+    summary: 'Extending confidentiality survival from 2 to 5 years may conflict with individual employee obligations.',
+    detail: 'The post-termination confidentiality obligation in clause 5.3 currently survives for 2 years. A proposed extension to 5 years may create tension with the Service Provider\'s standard employee contracts, which typically cap post-employment confidentiality obligations at 2 years in line with employment law guidance on restrictive covenants. The Service Provider\'s employment counsel should confirm that a 5-year entity-level obligation can be backed by equivalent individual obligations before this amendment is agreed.',
     actions: [
-      { id: 'cf4a', label: 'Update Schedule 2 to align with 5-year post-termination period' },
-      { id: 'cf4b', label: 'Retain 2-year period in clause 10.3 to match Schedule 2' },
+      { id: 'cf4a', label: 'Extend to 5 years — subject to Service Provider confirming employee coverage' },
+      { id: 'cf4b', label: 'Retain 2-year survival period to avoid downstream HR complications' },
     ],
   },
   {
     id: 'cf5', areaId: 'governing-law', areaLabel: 'Governing Law Cascade', severity: 'low',
-    summary: 'Changing governing law to New York conflicts with the arbitration clause referencing the English Arbitration Act 1996.',
-    detail: 'The arbitration clause at clause 14.2 specifies that any arbitral proceedings shall be conducted in accordance with the English Arbitration Act 1996. If governing law is changed to New York, the procedural law of arbitration should be updated to reference the Federal Arbitration Act or the New York CPLR. This is a procedural inconsistency that could complicate enforcement of any award.',
+    summary: 'Changing jurisdiction to non-exclusive Irish courts conflicts with the LCIA arbitration clause in clause 10.2.',
+    detail: 'The counterparty has requested that clause 9.2 be amended to reference the courts of Ireland (non-exclusive) to accommodate their Dublin entity. However, clause 10.2 specifies London as the seat of LCIA arbitration. If governing law is changed to Irish law, the procedural law of arbitration should also be reviewed, and the LCIA clause may need to be updated to specify whether the Arbitration Act 2010 (Ireland) or the English Arbitration Act 1996 applies to the arbitral proceedings.',
     actions: [
-      { id: 'cf5a', label: 'Update arbitration clause to reference Federal Arbitration Act' },
-      { id: 'cf5b', label: 'Retain English governing law and remove New York change' },
+      { id: 'cf5a', label: 'Retain English law and London LCIA seat — request counterparty use English entity' },
+      { id: 'cf5b', label: 'Amend to Irish governing law and update arbitration clause accordingly' },
     ],
   },
 ]
