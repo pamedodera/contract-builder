@@ -13,7 +13,7 @@ const tabs: { id: Tab; label: string }[] = [
 ]
 
 export function DefinelySidebar() {
-  const [activeTab, setActiveTab] = useState<Tab>('review')
+  const [activeTab, setActiveTab] = useState<Tab>('home')
 
   return (
     <div className="brand-theme flex h-full w-1/3 shrink-0 flex-col border-l border-border bg-sidebar">

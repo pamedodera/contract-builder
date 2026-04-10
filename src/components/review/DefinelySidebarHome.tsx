@@ -6,15 +6,15 @@ import { Badge } from '@/components/ui/badge'
 import { ChatInput } from '@/components/sidebar/ChatInput'
 import { LinkedDocsPage } from './LinkedDocsPage'
 import { IssuesPage } from './IssuesPage'
+import { PrecedentSearchPage } from './PrecedentSearchPage'
+import { GapsPage } from './GapsPage'
 import { type MockDoc, proofFindings, cascadeFindings } from '@/data/mockReviewData'
 
-type View = 'home' | 'linked-docs' | 'proof-issues' | 'cascade-issues'
+type View = 'home' | 'linked-docs' | 'proof-issues' | 'cascade-issues' | 'precedent-search' | 'gaps'
 
-const actions = [
-  'Find similar language from a precedent',
-  'Find a precedent to compare & use',
-  'Apply the corresponding/consequential changes',
-  'Generate gaps list, and integrate gaps',
+const actions: { label: string; view: View }[] = [
+  { label: 'Find a precedent to compare & use', view: 'precedent-search' },
+  { label: 'Generate gaps list, and integrate gaps', view: 'gaps' },
 ]
 
 const issueTypes: { id: 'proof-issues' | 'cascade-issues'; label: string; count: number }[] = [
@@ -163,10 +163,11 @@ export function DefinelySidebarHome() {
                 <div className="rounded-md border border-border bg-card overflow-hidden divide-y divide-border">
                   {actions.map((action) => (
                     <button
-                      key={action}
+                      key={action.label}
+                      onClick={() => navigate(action.view, 1)}
                       className="w-full flex items-start justify-between gap-2 px-3 py-2.5 text-left hover:bg-accent transition-colors"
                     >
-                      <span className="text-sm text-foreground leading-snug">{action}</span>
+                      <span className="text-sm text-foreground leading-snug">{action.label}</span>
                       <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground mt-0.5" />
                     </button>
                   ))}
@@ -236,6 +237,36 @@ export function DefinelySidebarHome() {
               findings={cascadeFindings}
               onBack={() => navigate('home', -1)}
             />
+          </motion.div>
+        )}
+
+        {view === 'precedent-search' && (
+          <motion.div
+            key="precedent-search"
+            custom={direction}
+            variants={slideVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={transition}
+            className="absolute inset-0 flex flex-col"
+          >
+            <PrecedentSearchPage onBack={() => navigate('home', -1)} />
+          </motion.div>
+        )}
+
+        {view === 'gaps' && (
+          <motion.div
+            key="gaps"
+            custom={direction}
+            variants={slideVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={transition}
+            className="absolute inset-0 flex flex-col"
+          >
+            <GapsPage onBack={() => navigate('home', -1)} />
           </motion.div>
         )}
       </AnimatePresence>

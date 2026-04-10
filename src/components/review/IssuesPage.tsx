@@ -44,6 +44,7 @@ export function IssuesPage({ title, findings, onBack }: IssuesPageProps) {
             defaultOpen={i === 0}
             isInserted={insertedIds.has(finding.id)}
             onInserted={() => setInsertedIds((prev) => new Set(prev).add(finding.id))}
+            onUndoInserted={() => setInsertedIds((prev) => { const next = new Set(prev); next.delete(finding.id); return next })}
             selectedAction={selectedActions[finding.id] ?? null}
             onActionSelect={(id) => setSelectedActions((prev) => ({ ...prev, [finding.id]: id }))}
           />
