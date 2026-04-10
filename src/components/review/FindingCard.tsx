@@ -3,7 +3,7 @@ import { ChevronDown, ChevronUp, Loader2, Check } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import type { Finding } from '@/data/mockReviewData'
+import type { Finding, RedlineSegment } from '@/data/mockReviewData'
 
 interface FindingCardProps {
   finding: Finding
@@ -35,14 +35,19 @@ export function FindingCard({ finding, defaultOpen = false, isInserted = false, 
   const [insertingId, setInsertingId] = useState<string | null>(null)
   const [insertedActionId, setInsertedActionId] = useState<string | null>(null)
   const [undoing, setUndoing] = useState(false)
+  const [showRedline, setShowRedline] = useState(false)
   const config = trafficLight ? trafficLightConfig[finding.severity] : severityConfig[finding.severity]
   const hasActions = finding.actions && finding.actions.length > 0
 
   const selectedAction = controlledAction !== undefined ? controlledAction : internalAction
   function setSelectedAction(id: string | null) {
+    setShowRedline(false)
     if (onActionSelect) onActionSelect(id)
     else setInternalAction(id)
   }
+
+  const currentAction = finding.actions?.find((a) => a.id === selectedAction) ?? null
+  const currentRedline = currentAction?.redline ?? null
 
   function handleInsert(actionId: string) {
     setInsertingId(actionId)
@@ -137,6 +142,46 @@ export function FindingCard({ finding, defaultOpen = false, isInserted = false, 
                   )}
                 </div>
               ))}
+            </div>
+          )}
+          {currentRedline && (
+            <div className="border-t border-border pt-3 space-y-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground -ml-2"
+                onClick={() => setShowRedline((v) => !v)}
+              >
+                {showRedline ? 'Hide redline' : 'View redline'}
+              </Button>
+              {showRedline && (
+                <div className="rounded-md border border-border bg-muted/30 px-3 py-2.5 space-y-1.5">
+                  <p className="text-xs font-medium text-muted-foreground">{currentRedline.clauseRef}</p>
+                  <p className="text-sm leading-relaxed">
+                    {currentRedline.segments.map((seg: RedlineSegment, i: number) => {
+                      if (seg.type === 'removed') {
+                        return (
+                          <span key={i} className="line-through text-red-600 bg-red-50/60">
+                            {seg.text}
+                          </span>
+                        )
+                      }
+                      if (seg.type === 'added') {
+                        return (
+                          <span key={i} className="text-green-700 bg-green-50/60">
+                            {seg.text}
+                          </span>
+                        )
+                      }
+                      return (
+                        <span key={i} className="text-muted-foreground">
+                          {seg.text}
+                        </span>
+                      )
+                    })}
+                  </p>
+                </div>
+              )}
             </div>
           )}
           {needsResolution && open && (
