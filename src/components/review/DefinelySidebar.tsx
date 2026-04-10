@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import { ReviewSidebar } from './ReviewSidebar'
+import { DefinelySidebarHome } from './DefinelySidebarHome'
 
 type Tab = 'home' | 'review' | 'enhance' | 'library'
 
@@ -42,7 +43,9 @@ export function DefinelySidebar() {
         </div>
       )}
 
-      {activeTab !== 'review' && (
+      {activeTab === 'home' && <DefinelySidebarHome />}
+
+      {activeTab !== 'review' && activeTab !== 'home' && (
         <div className="flex-1 flex items-center justify-center">
           <p className="text-sm text-muted-foreground">
             {tabs.find((t) => t.id === activeTab)?.label} — coming soon
