@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Sidebar } from '@/components/sidebar/Sidebar'
 import { ReviewSidebar } from '@/components/review/ReviewSidebar'
 import { DefinelySidebar } from '@/components/review/DefinelySidebar'
+import { DocumentViewer } from '@/components/document/DocumentViewer'
 import { cn } from '@/lib/utils'
 
 const flows = [
@@ -56,10 +57,8 @@ function App() {
         )}
         {activeFlow === 'definely-brand' && (
           <>
-            <main className="flex w-2/3 items-center justify-center bg-muted/30">
-              <span className="text-muted-foreground text-sm select-none">
-                Imagine a document comes here.
-              </span>
+            <main className="flex w-2/3 overflow-hidden">
+              <DocumentViewer onTermClick={() => {}} />
             </main>
             <DefinelySidebar />
           </>
