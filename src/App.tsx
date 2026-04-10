@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { Sidebar } from '@/components/sidebar/Sidebar'
 import { ReviewSidebar } from '@/components/review/ReviewSidebar'
+import { DefinelySidebar } from '@/components/review/DefinelySidebar'
 import { cn } from '@/lib/utils'
 
 const flows = [
   { id: 'contract-builder', label: 'Contract Builder' },
   { id: 'review', label: 'Review' },
+  { id: 'definely-brand', label: 'Definely Brand' },
 ]
 
 function App() {
@@ -52,6 +54,16 @@ function App() {
               </span>
             </main>
             <ReviewSidebar />
+          </>
+        )}
+        {activeFlow === 'definely-brand' && (
+          <>
+            <main className="flex w-2/3 items-center justify-center bg-muted/30">
+              <span className="text-muted-foreground text-sm select-none">
+                Imagine a document comes here.
+              </span>
+            </main>
+            <DefinelySidebar />
           </>
         )}
       </div>
