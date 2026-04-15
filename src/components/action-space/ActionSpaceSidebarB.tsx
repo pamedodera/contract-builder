@@ -650,7 +650,7 @@ export function ActionSpaceSidebarB() {
                   onClick={() => setMode('edit')}
                   className="w-full flex items-center justify-between rounded-b-[14px] border border-input bg-background px-3 py-[9px] hover:bg-accent transition-colors group -mt-px"
                 >
-                  <span className="text-[13px] font-medium text-foreground">Working on the Edit Space</span>
+                  <span className="text-sm font-medium text-foreground">Working on the Edit Space</span>
                   <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0 group-hover:translate-x-0.5 transition-transform" />
                 </button>
               </div>
@@ -714,8 +714,8 @@ export function ActionSpaceSidebarB() {
                   {agentStep >= 6 && hasVisitedEditSpace && (
                     <>
                     <div className="flex flex-col gap-2">
-                      <div className="flex items-center gap-2">
-                        <div className="shrink-0 h-6 w-6 rounded-full bg-primary" />
+                      <div className="flex items-center gap-2 py-1">
+                        <div className="shrink-0 h-6 w-6 rounded-full bg-[#DEE3F0]" />
                         <p className="text-[16px] text-foreground">The alternative clause I found from the selected documents</p>
                       </div>
                       <div className="w-full rounded-xl border border-border bg-background p-3 flex flex-col gap-2">
