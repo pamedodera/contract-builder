@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
-import { motion } from 'motion/react'
+import { useState, useEffect, useRef } from 'react'
+import { motion, AnimatePresence } from 'motion/react'
 import { cn } from '@/lib/utils'
-import { Plus, ChevronDown, ChevronRight, ArrowRight, Check, Loader2 } from 'lucide-react'
+import { Plus, ChevronDown, ChevronUp, ChevronRight, ArrowRight, Check, Loader2, Undo2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -14,6 +14,15 @@ type View = 'main' | 'definitions'
 type Mode = 'edit' | 'chat'
 type ChatPhase = 'idle' | 'confirming' | 'processing'
 type StepStatus = 'loading' | 'done' | 'waiting'
+type InsertStatus = 'pending' | 'inserting' | 'inserted' | 'undone' | 'cancelled'
+type InsertPhase = 'idle' | 'running' | 'stopped' | 'done'
+type InsertItem = {
+  id: string
+  type: 'clause' | 'definition'
+  label: string
+  location: string
+  status: InsertStatus
+}
 
 const tabs: { id: Tab; label: string }[] = [
   { id: 'vault', label: 'Vault' },
@@ -51,6 +60,13 @@ const definitions: { id: string; label: string; description: string; source: Sou
     source: { type: 'ai' },
   },
 ]
+
+const definitionLocations: Record<string, string> = {
+  'environmental-laws': "Definitions · after 'Environmental Claim'",
+  'hazardous-substances': "Definitions · after 'Guarantor'",
+  'remediation': "Definitions · after 'Related Fund'",
+  'force-majeure': "Definitions · after 'Finance Documents'",
+}
 
 const saasAgreements = [
   'Salesforce Order Form – MSA 2023',
@@ -109,6 +125,98 @@ function TimelineStep({
   )
 }
 
+function InsertItemCard({
+  item,
+  onStop,
+  onUndo,
+}: {
+  item: InsertItem
+  onStop: () => void
+  onUndo: (id: string) => void
+}) {
+  const typeLabel = item.type === 'clause' ? 'Clause' : 'Definition'
+  return (
+    <div
+      className={cn(
+        'w-full rounded-xl border border-border bg-background p-3 flex items-start gap-3',
+        (item.status === 'pending' || item.status === 'cancelled') && 'opacity-40'
+      )}
+    >
+      {/* Icon */}
+      <div className="mt-0.5 shrink-0">
+        {item.status === 'pending' && (
+          <div className="h-4 w-4 rounded-full border border-muted-foreground/50" />
+        )}
+        {item.status === 'inserting' && (
+          <Loader2 className="h-4 w-4 text-muted-foreground animate-spin" />
+        )}
+        {item.status === 'inserted' && (
+          <div className="h-4 w-4 rounded-full bg-green-100 flex items-center justify-center">
+            <Check className="h-2.5 w-2.5 text-green-600" />
+          </div>
+        )}
+        {item.status === 'undone' && (
+          <Undo2 className="h-4 w-4 text-muted-foreground" />
+        )}
+        {item.status === 'cancelled' && (
+          <div className="h-4 w-4 rounded-full border border-muted-foreground/40" />
+        )}
+      </div>
+
+      {/* Text */}
+      <div className="flex-1 flex flex-col gap-0.5 min-w-0">
+        {item.status === 'pending' && (
+          <>
+            <span className="text-[13px] font-medium text-muted-foreground">{typeLabel} queued</span>
+            <span className="text-[12px] text-muted-foreground truncate">"{item.label}"</span>
+          </>
+        )}
+        {item.status === 'inserting' && (
+          <>
+            <span className="text-[13px] font-medium">Inserting {typeLabel.toLowerCase()}</span>
+            <span className="text-[12px] text-muted-foreground">"{item.label}" · {item.location}</span>
+          </>
+        )}
+        {item.status === 'inserted' && (
+          <>
+            <span className="text-[13px] font-medium">{typeLabel} inserted</span>
+            <span className="text-[12px] text-muted-foreground">"{item.label}" · {item.location}</span>
+          </>
+        )}
+        {item.status === 'undone' && (
+          <>
+            <span className="text-[13px] font-medium text-muted-foreground">{typeLabel} removed</span>
+            <span className="text-[12px] text-muted-foreground">"{item.label}"</span>
+          </>
+        )}
+        {item.status === 'cancelled' && (
+          <>
+            <span className="text-[13px] font-medium text-muted-foreground">{typeLabel} not inserted</span>
+            <span className="text-[12px] text-muted-foreground">"{item.label}"</span>
+          </>
+        )}
+      </div>
+
+      {/* Actions */}
+      {item.status === 'inserting' && (
+        <Button
+          variant="ghost"
+          size="xs"
+          onClick={onStop}
+          className="shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+        >
+          Stop
+        </Button>
+      )}
+      {item.status === 'inserted' && (
+        <Button variant="ghost" size="xs" onClick={() => onUndo(item.id)} className="shrink-0">
+          Undo
+        </Button>
+      )}
+    </div>
+  )
+}
+
 export function ActionSpaceSidebarB() {
   const [activeTab, setActiveTab] = useState<Tab>('enhance')
   const [view, setView] = useState<View>('main')
@@ -116,12 +224,17 @@ export function ActionSpaceSidebarB() {
   const [chatPhase, setChatPhase] = useState<ChatPhase>('idle')
   const [agentStep, setAgentStep] = useState(0)
   const [isTransitioning, setIsTransitioning] = useState(false)
+  const [hasVisitedEditSpace, setHasVisitedEditSpace] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [reasonExpanded, setReasonExpanded] = useState(false)
   const [showRedline, setShowRedline] = useState(true)
   const [checked, setChecked] = useState<Record<string, boolean>>(
     Object.fromEntries(definitions.map((d) => [d.id, true]))
   )
+  const [insertPhase, setInsertPhase] = useState<InsertPhase>('idle')
+  const [insertItems, setInsertItems] = useState<InsertItem[]>([])
+  const [insertStep, setInsertStep] = useState(-1)
+  const insertItemsRef = useRef<InsertItem[]>([])
 
   const allChecked = definitions.every((d) => checked[d.id])
   const checkedCount = definitions.filter((d) => checked[d.id]).length
@@ -153,12 +266,33 @@ export function ActionSpaceSidebarB() {
       const tFade = setTimeout(() => setIsTransitioning(true), 400)
       const tSwitch = setTimeout(() => {
         setMode('edit')
+        setHasVisitedEditSpace(true)
         // Preserve chatPhase and agentStep so the conversation is still visible when navigating back
         requestAnimationFrame(() => requestAnimationFrame(() => setIsTransitioning(false)))
       }, 1000)
       return () => { clearTimeout(tFade); clearTimeout(tSwitch) }
     }
   }, [agentStep])
+
+  // Drive insert item sequence one step at a time
+  useEffect(() => {
+    if (insertPhase !== 'running' || insertStep < 0) return
+    const items = insertItemsRef.current
+    if (insertStep >= items.length) {
+      setInsertPhase('done')
+      return
+    }
+    setInsertItems((prev) =>
+      prev.map((item, i) => (i === insertStep ? { ...item, status: 'inserting' } : item))
+    )
+    const t = setTimeout(() => {
+      setInsertItems((prev) =>
+        prev.map((item, i) => (i === insertStep ? { ...item, status: 'inserted' } : item))
+      )
+      setInsertStep((s) => s + 1)
+    }, 1200)
+    return () => clearTimeout(t)
+  }, [insertStep, insertPhase])
 
   function toggleSelectAll() {
     const next = !allChecked
@@ -173,6 +307,50 @@ export function ActionSpaceSidebarB() {
     setChatPhase('processing')
   }
 
+  function handleInsert() {
+    const items: InsertItem[] = [
+      {
+        id: 'clause',
+        type: 'clause',
+        label: 'Letters of Credit – Authorisation',
+        location: 'after clause 7.1(a)',
+        status: 'pending',
+      },
+      ...definitions
+        .filter((d) => checked[d.id])
+        .map((d) => ({
+          id: d.id,
+          type: 'definition' as const,
+          label: d.label,
+          location: definitionLocations[d.id] ?? 'Definitions section',
+          status: 'pending' as InsertStatus,
+        })),
+    ]
+    insertItemsRef.current = items
+    setInsertItems(items)
+    setInsertStep(0)
+    setInsertPhase('running')
+    setMode('chat')
+    setView('main')
+  }
+
+  function handleStop() {
+    setInsertPhase('stopped')
+    setInsertItems((prev) =>
+      prev.map((item) =>
+        item.status === 'pending' || item.status === 'inserting'
+          ? { ...item, status: 'cancelled' }
+          : item
+      )
+    )
+  }
+
+  function handleUndo(id: string) {
+    setInsertItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, status: 'undone' } : item))
+    )
+  }
+
   const insertSummary = checkedCount === 0
     ? '1 clause to insert'
     : `1 clause and ${checkedCount} ${checkedCount === 1 ? 'definition' : 'definitions'} to insert`
@@ -184,7 +362,7 @@ export function ActionSpaceSidebarB() {
         <p className="text-[14px] text-muted-foreground leading-[20px]">Edit will be inserted as plain text</p>
       </div>
       <div className="flex items-center shrink-0">
-        <Button variant="default" size="default" className="rounded-r-none">Insert edit</Button>
+        <Button variant="default" size="default" className="rounded-r-none" onClick={handleInsert}>Insert edit</Button>
         <Popover open={menuOpen} onOpenChange={setMenuOpen}>
           <PopoverTrigger asChild>
             <Button
@@ -343,16 +521,15 @@ export function ActionSpaceSidebarB() {
                     </div>
                   )}
 
-                  {/* Edit Space entry card — shown once all steps are done */}
-                  {agentStep >= 6 && (
-                    <button
-                      onClick={() => setMode('edit')}
-                      className="w-full rounded-xl border border-border bg-background px-3 py-3 flex items-center justify-between hover:bg-accent transition-colors group"
-                    >
-                      <span className="text-[13px] font-medium text-foreground">Working on the Edit Space</span>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0 group-hover:translate-x-0.5 transition-transform" />
-                    </button>
-                  )}
+                  {/* Insert action cards */}
+                  {insertItems.map((item) => (
+                    <InsertItemCard
+                      key={item.id}
+                      item={item}
+                      onStop={handleStop}
+                      onUndo={handleUndo}
+                    />
+                  ))}
                 </>
               )}
             </div>
@@ -386,9 +563,22 @@ export function ActionSpaceSidebarB() {
                 </div>
               )}
 
-              <div className="px-3 py-3">
-                <ChatInput onSend={() => setChatPhase('confirming')} placeholder="Ask Enhance" rows={2} />
-              </div>
+              {agentStep >= 6 && hasVisitedEditSpace ? (
+                <div className="mx-2 mt-3 mb-3 flex flex-col">
+                  <button
+                    onClick={() => setMode('edit')}
+                    className="mx-3 flex items-center justify-between rounded-t-[14px] border border-input bg-background px-3 py-[11px] -mb-px relative z-10 hover:bg-accent transition-colors group"
+                  >
+                    <span className="text-[13px] font-medium text-foreground">Working on the Edit Space</span>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0 group-hover:translate-x-0.5 transition-transform" />
+                  </button>
+                  <ChatInput onSend={() => setChatPhase('confirming')} placeholder="Ask Enhance" rows={2} />
+                </div>
+              ) : (
+                <div className="px-3 py-3">
+                  <ChatInput onSend={() => setChatPhase('confirming')} placeholder="Ask Enhance" rows={2} />
+                </div>
+              )}
             </div>
           </>
         )}
@@ -421,15 +611,25 @@ export function ActionSpaceSidebarB() {
                   >
                     <p className="flex-1 text-[14px] font-medium leading-[20px] text-muted-foreground">Reason for change</p>
                     {reasonExpanded
-                      ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                      : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      ? <ChevronUp className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      : <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                     }
                   </button>
+                  <AnimatePresence initial={false}>
                   {reasonExpanded && (
-                    <p className="text-[14px] leading-[20px]">
-                      These changes would narrow the Borrower's authorisation without materially departing from market-standard LMA risk allocation, while providing protection against defective or fraudulent claims.
-                    </p>
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2, ease: 'easeInOut' }}
+                      style={{ overflow: 'hidden' }}
+                    >
+                      <p className="text-[14px] leading-[20px] pt-1">
+                        These changes would narrow the Borrower's authorisation without materially departing from market-standard LMA risk allocation, while providing protection against defective or fraudulent claims.
+                      </p>
+                    </motion.div>
                   )}
+                </AnimatePresence>
                 </div>
               </motion.div>
 
@@ -444,7 +644,7 @@ export function ActionSpaceSidebarB() {
                   className="group w-full text-left rounded border border-border bg-[#d3d9eb] px-3 py-2.5 flex items-start gap-3 hover:bg-[#c8d0e8] transition-colors"
                 >
                   <div className="flex-1 flex flex-col gap-1">
-                    <p className="text-[14px] font-medium leading-[20px] text-muted-foreground">Definitions</p>
+                    <p className="text-[14px] font-medium leading-[20px] text-muted-foreground">{definitions.length} Definitions</p>
                     <p className="text-[14px] leading-[20px]">
                       The following definitions resolve terms introduced by this clause. AI-drafted ones are a first draft — review them on the document after inserting.
                     </p>
@@ -471,7 +671,12 @@ export function ActionSpaceSidebarB() {
         {mode === 'edit' && activeTab === 'enhance' && view === 'definitions' && (
           <>
             <div className="flex-1 overflow-y-auto min-h-0 px-3 pt-3 pb-3 flex flex-col gap-3">
-              <div className="flex items-start gap-3">
+              <motion.div
+                className="flex items-start gap-3"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, ease: 'easeOut', delay: 0.05 }}
+              >
                 <div className="flex-1 flex flex-col gap-1">
                   <p className="text-[14px] font-semibold leading-[20px] text-muted-foreground">Definitions</p>
                   <p className="text-[14px] text-muted-foreground leading-[20px]">
@@ -483,15 +688,18 @@ export function ActionSpaceSidebarB() {
                     {allChecked ? 'Deselect all' : 'Select all'}
                   </Button>
                 </div>
-              </div>
+              </motion.div>
               <div className="flex flex-col">
                 {definitions.map((def, i) => (
-                  <div
+                  <motion.div
                     key={def.id}
                     className={cn(
                       'grid grid-cols-4 gap-x-3 py-3',
                       i < definitions.length - 1 && 'border-b border-border'
                     )}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, ease: 'easeOut', delay: 0.1 + i * 0.08 }}
                   >
                     <div className="col-span-3 flex items-start gap-2">
                       <Checkbox
@@ -507,13 +715,18 @@ export function ActionSpaceSidebarB() {
                     <div className="col-span-1 flex justify-end pt-0.5">
                       <SourceBadge source={def.source} />
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
             </div>
-            <div className="shrink-0 border-t border-border flex flex-col bg-background">
+            <motion.div
+              className="shrink-0 border-t border-border flex flex-col bg-background"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, ease: 'easeOut', delay: 0.1 + definitions.length * 0.08 }}
+            >
               {footer}
-            </div>
+            </motion.div>
           </>
         )}
 

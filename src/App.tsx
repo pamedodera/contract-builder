@@ -14,7 +14,9 @@ const flows = [
 ]
 
 function App() {
-  const [activeFlow, setActiveFlow] = useState('action-space-b')
+  const [activeFlow, setActiveFlow] = useState(
+    new URLSearchParams(window.location.search).get('flow') ?? 'action-space-b'
+  )
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden">
