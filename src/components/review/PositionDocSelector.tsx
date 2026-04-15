@@ -1,4 +1,4 @@
-import { Building2, BookOpen, FileText, CheckCircle2 } from 'lucide-react'
+import { Building2, BookOpen, FileText } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import { DropZone } from './DropZone'
@@ -8,7 +8,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from '@/components/ui/select'
 
 interface PositionDocSelectorProps {
@@ -63,62 +62,41 @@ function PositionSection({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-xs font-medium text-foreground">{label}</p>
-          <p className="text-xs text-muted-foreground">{description}</p>
-        </div>
-        {selectedDoc?.id && (
-          <div className="flex items-center gap-1 text-xs text-green-600 font-medium shrink-0">
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            Selected
-          </div>
-        )}
+      <div>
+        <p className="text-xs font-medium text-foreground">{label}</p>
+        <p className="text-xs text-muted-foreground">{description}</p>
       </div>
 
-      {selectedDoc?.id ? (
-        <div className="flex items-center justify-between rounded-md border border-green-200 bg-green-50 px-3 py-2">
-          <span className="text-sm text-foreground truncate">{selectedDoc.title}</span>
-          <button
-            onClick={() => onDocSelect({ id: '', title: '', date: '' })}
-            className="text-xs text-muted-foreground hover:text-foreground ml-2 shrink-0"
-          >
-            Change
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {/* Source button group */}
-          <div className="flex rounded-md border border-border overflow-hidden">
-            <SourceTab icon={Building2} label="iManage" active={activeSource === 'imanage'} onClick={() => setActiveSource('imanage')} />
-            <SourceTab icon={BookOpen} label="Library" active={activeSource === 'library'} onClick={() => setActiveSource('library')} bordered />
-            <SourceTab icon={FileText} label="Upload" active={activeSource === 'upload'} onClick={() => setActiveSource('upload')} bordered />
-          </div>
+      {/* Source button group */}
+      <div className="flex rounded-md border border-border overflow-hidden">
+        <SourceTab icon={Building2} label="iManage" active={activeSource === 'imanage'} onClick={() => setActiveSource('imanage')} />
+        <SourceTab icon={BookOpen} label="Library" active={activeSource === 'library'} onClick={() => setActiveSource('library')} bordered />
+        <SourceTab icon={FileText} label="Upload" active={activeSource === 'upload'} onClick={() => setActiveSource('upload')} bordered />
+      </div>
 
-          {/* Source content */}
-          {(activeSource === 'imanage' || activeSource === 'library') && (
-            <Select onValueChange={handleSelectChange} value={selectedDoc?.id ?? ''}>
-              <SelectTrigger className="w-full h-9 text-sm">
-                <SelectValue placeholder="Select a document…" />
-              </SelectTrigger>
-              <SelectContent>
-                {docs.map((doc) => (
-                  <SelectItem key={doc.id} value={doc.id}>
-                    <span className="flex w-full items-center justify-between gap-3">
-                      <span className="truncate">{doc.title}</span>
-                      <span className="text-xs text-muted-foreground shrink-0">{doc.date}</span>
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+      {(activeSource === 'imanage' || activeSource === 'library') && (
+        <Select onValueChange={handleSelectChange} value={selectedDoc?.id ?? ''}>
+          <SelectTrigger className="w-full h-9 text-sm">
+            <span className={cn('flex-1 text-left truncate', !selectedDoc?.id && 'text-muted-foreground')}>
+              {selectedDoc?.id ? selectedDoc.title : 'Select a document…'}
+            </span>
+          </SelectTrigger>
+          <SelectContent>
+            {docs.map((doc) => (
+              <SelectItem key={doc.id} value={doc.id}>
+                <span className="flex w-full items-center justify-between gap-3">
+                  <span className="truncate">{doc.title}</span>
+                  <span className="text-xs text-muted-foreground shrink-0">{doc.date}</span>
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
 
-          {activeSource === 'upload' && (
-            <div className="rounded-md border border-border p-3">
-              <DropZone onDocSelect={onDocSelect} />
-            </div>
-          )}
+      {activeSource === 'upload' && (
+        <div className="rounded-md border border-border p-3">
+          <DropZone onDocSelect={onDocSelect} />
         </div>
       )}
     </div>

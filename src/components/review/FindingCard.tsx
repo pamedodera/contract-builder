@@ -3,13 +3,14 @@ import { ChevronDown, ChevronUp, Loader2, Check } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import type { Finding } from '@/data/mockReviewData'
+import type { Finding, RedlineSegment } from '@/data/mockReviewData'
 
 interface FindingCardProps {
   finding: Finding
   defaultOpen?: boolean
   isInserted?: boolean
   onInserted?: () => void
+  onUndoInserted?: () => void
   selectedAction?: string | null
   onActionSelect?: (actionId: string | null) => void
   showValidation?: boolean
@@ -28,19 +29,28 @@ const trafficLightConfig = {
   low: { label: 'Within Standard', className: 'text-green-600 border-green-300 bg-green-50' },
 }
 
-export function FindingCard({ finding, defaultOpen = false, isInserted = false, onInserted, selectedAction: controlledAction, onActionSelect, showValidation = false, trafficLight = false }: FindingCardProps) {
+export function FindingCard({ finding, defaultOpen = false, isInserted = false, onInserted, onUndoInserted, selectedAction: controlledAction, onActionSelect, showValidation = false, trafficLight = false }: FindingCardProps) {
   const [open, setOpen] = useState(defaultOpen)
   const [internalAction, setInternalAction] = useState<string | null>(null)
   const [insertingId, setInsertingId] = useState<string | null>(null)
   const [insertedActionId, setInsertedActionId] = useState<string | null>(null)
+  const [undoing, setUndoing] = useState(false)
+  const [showRedline, setShowRedline] = useState(false)
   const config = trafficLight ? trafficLightConfig[finding.severity] : severityConfig[finding.severity]
   const hasActions = finding.actions && finding.actions.length > 0
+  const isSingleAction = hasActions && finding.actions!.length === 1
 
   const selectedAction = controlledAction !== undefined ? controlledAction : internalAction
   function setSelectedAction(id: string | null) {
+    setShowRedline(false)
     if (onActionSelect) onActionSelect(id)
     else setInternalAction(id)
   }
+
+  // For single-action findings the action is implicitly always selected
+  const effectiveActionId = isSingleAction ? finding.actions![0].id : selectedAction
+  const currentAction = finding.actions?.find((a) => a.id === effectiveActionId) ?? null
+  const currentRedline = currentAction?.redline ?? null
 
   function handleInsert(actionId: string) {
     setInsertingId(actionId)
@@ -51,7 +61,15 @@ export function FindingCard({ finding, defaultOpen = false, isInserted = false, 
     }, 1500)
   }
 
-  const needsResolution = showValidation && !isInserted && !selectedAction && hasActions
+  function handleUndo() {
+    setUndoing(true)
+    setTimeout(() => {
+      setInsertedActionId(null)
+      onUndoInserted?.()
+    }, 1000)
+  }
+
+  const needsResolution = showValidation && !isInserted && !selectedAction && hasActions && !isSingleAction
 
   return (
     <div className={cn('rounded-md border bg-card overflow-hidden', needsResolution ? 'border-amber-400' : 'border-border')}>
@@ -81,7 +99,33 @@ export function FindingCard({ finding, defaultOpen = false, isInserted = false, 
       {open && (
         <div className="border-t border-border px-3 py-2.5 space-y-3">
           <p className="text-sm text-muted-foreground leading-relaxed">{finding.detail}</p>
-          {hasActions && (
+          {hasActions && isSingleAction && (
+            <div className="border-t border-border pt-3 flex items-start justify-between gap-2.5">
+              <p className="flex-1 text-sm text-muted-foreground leading-snug">
+                {finding.actions![0].label}
+              </p>
+              {insertedActionId !== finding.actions![0].id ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="shrink-0 h-6 px-2 text-xs -mt-0.5"
+                  disabled={insertingId === finding.actions![0].id}
+                  onClick={(e) => { e.stopPropagation(); handleInsert(finding.actions![0].id) }}
+                >
+                  {insertingId === finding.actions![0].id
+                    ? <Loader2 className="h-3 w-3 animate-spin" />
+                    : 'Insert'
+                  }
+                </Button>
+              ) : (
+                <span className="shrink-0 flex items-center gap-1 text-xs font-medium text-green-600 -mt-0.5">
+                  <Check className="h-3 w-3" />
+                  Inserted
+                </span>
+              )}
+            </div>
+          )}
+          {hasActions && !isSingleAction && (
             <div className="space-y-2 border-t border-border pt-3">
               <p className="text-xs font-medium text-foreground">How would you like to resolve this?</p>
               {finding.actions!.map((action) => (
@@ -129,6 +173,46 @@ export function FindingCard({ finding, defaultOpen = false, isInserted = false, 
               ))}
             </div>
           )}
+          {currentRedline && (
+            <div className="border-t border-border pt-3 space-y-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground -ml-2"
+                onClick={() => setShowRedline((v) => !v)}
+              >
+                {showRedline ? 'Hide redline' : 'View redline'}
+              </Button>
+              {showRedline && (
+                <div className="rounded-md border border-border bg-muted/30 px-3 py-2.5 space-y-1.5">
+                  <p className="text-xs font-medium text-muted-foreground">{currentRedline.clauseRef}</p>
+                  <p className="text-sm leading-relaxed">
+                    {currentRedline.segments.map((seg: RedlineSegment, i: number) => {
+                      if (seg.type === 'removed') {
+                        return (
+                          <span key={i} className="line-through text-red-600 bg-red-50/60">
+                            {seg.text}
+                          </span>
+                        )
+                      }
+                      if (seg.type === 'added') {
+                        return (
+                          <span key={i} className="text-green-700 bg-green-50/60">
+                            {seg.text}
+                          </span>
+                        )
+                      }
+                      return (
+                        <span key={i} className="text-muted-foreground">
+                          {seg.text}
+                        </span>
+                      )
+                    })}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
           {needsResolution && open && (
             <p className="text-xs text-amber-600 pt-1">Select a resolution above before inserting.</p>
           )}
@@ -137,6 +221,26 @@ export function FindingCard({ finding, defaultOpen = false, isInserted = false, 
       {needsResolution && !open && (
         <div className="border-t border-amber-200 bg-amber-50/60 px-3 py-1.5">
           <p className="text-xs text-amber-600">Select a resolution to insert changes.</p>
+        </div>
+      )}
+      {isInserted && (
+        <div className="border-t border-green-100 bg-green-50/40 px-3 py-1.5 flex items-center justify-between">
+          <span className="flex items-center gap-1.5 text-xs font-medium text-green-600">
+            {undoing
+              ? <Loader2 className="h-3 w-3 animate-spin" />
+              : <Check className="h-3 w-3" />}
+            {undoing ? 'Undoing…' : 'Fix inserted'}
+          </span>
+          {!undoing && onUndoInserted && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs text-muted-foreground"
+              onClick={handleUndo}
+            >
+              Undo
+            </Button>
+          )}
         </div>
       )}
     </div>

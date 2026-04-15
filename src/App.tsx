@@ -1,15 +1,20 @@
 import { useState } from 'react'
 import { Sidebar } from '@/components/sidebar/Sidebar'
 import { ReviewSidebar } from '@/components/review/ReviewSidebar'
+import { DefinelySidebar } from '@/components/review/DefinelySidebar'
+import { ActionSpaceSidebar } from '@/components/action-space/ActionSpaceSidebar'
+import { ActionSpaceSidebarB } from '@/components/action-space/ActionSpaceSidebarB'
+import { DocumentViewer } from '@/components/document/DocumentViewer'
 import { cn } from '@/lib/utils'
 
 const flows = [
-  { id: 'contract-builder', label: 'Contract Builder' },
-  { id: 'review', label: 'Review' },
+  { id: 'definely-brand', label: 'Future Proposals' },
+  { id: 'action-space', label: 'Actions Flow' },
+  { id: 'action-space-b', label: 'Actions Flow - Option B' },
 ]
 
 function App() {
-  const [activeFlow, setActiveFlow] = useState('contract-builder')
+  const [activeFlow, setActiveFlow] = useState('action-space-b')
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden">
@@ -52,6 +57,30 @@ function App() {
               </span>
             </main>
             <ReviewSidebar />
+          </>
+        )}
+        {activeFlow === 'definely-brand' && (
+          <>
+            <main className="flex w-2/3 overflow-hidden">
+              <DocumentViewer onTermClick={() => {}} />
+            </main>
+            <DefinelySidebar />
+          </>
+        )}
+        {activeFlow === 'action-space' && (
+          <>
+            <main className="flex w-2/3 overflow-hidden">
+              <DocumentViewer onTermClick={() => {}} />
+            </main>
+            <ActionSpaceSidebar />
+          </>
+        )}
+        {activeFlow === 'action-space-b' && (
+          <>
+            <main className="flex w-2/3 overflow-hidden">
+              <DocumentViewer onTermClick={() => {}} />
+            </main>
+            <ActionSpaceSidebarB />
           </>
         )}
       </div>
