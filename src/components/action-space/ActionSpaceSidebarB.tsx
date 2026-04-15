@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { motion } from 'motion/react'
 import { cn } from '@/lib/utils'
 import { Plus, ChevronDown, ChevronRight, ArrowRight, Check, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -11,7 +12,7 @@ import { ClauseCardFlat } from './ClauseCardFlat'
 type Tab = 'vault' | 'draft' | 'proof' | 'cascade' | 'enhance'
 type View = 'main' | 'definitions'
 type Mode = 'edit' | 'chat'
-type ChatPhase = 'idle' | 'confirming'
+type ChatPhase = 'idle' | 'confirming' | 'processing'
 type StepStatus = 'loading' | 'done' | 'waiting'
 
 const tabs: { id: Tab; label: string }[] = [
@@ -86,7 +87,6 @@ function TimelineStep({
 }) {
   return (
     <div className="flex gap-3">
-      {/* Icon + connector */}
       <div className="flex flex-col items-center">
         {status === 'done' && (
           <div className="mt-0.5 h-4 w-4 shrink-0 rounded-full bg-green-100 flex items-center justify-center">
@@ -101,7 +101,6 @@ function TimelineStep({
         )}
         {showConnector && <div className="w-px bg-border flex-1 mt-1" />}
       </div>
-      {/* Content */}
       <div className={cn('flex flex-col gap-0.5 min-w-0', showConnector && 'pb-3')}>
         <span className="text-[13px] font-medium leading-[18px] text-foreground">{label}</span>
         <p className="text-[12px] text-muted-foreground leading-[16px]">{description}</p>
@@ -116,6 +115,7 @@ export function ActionSpaceSidebarB() {
   const [mode, setMode] = useState<Mode>('edit')
   const [chatPhase, setChatPhase] = useState<ChatPhase>('idle')
   const [agentStep, setAgentStep] = useState(0)
+  const [isTransitioning, setIsTransitioning] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [reasonExpanded, setReasonExpanded] = useState(false)
   const [showRedline, setShowRedline] = useState(true)
@@ -126,7 +126,7 @@ export function ActionSpaceSidebarB() {
   const allChecked = definitions.every((d) => checked[d.id])
   const checkedCount = definitions.filter((d) => checked[d.id]).length
 
-  // Animate agent steps when chat phase starts
+  // Phase 1: animate steps 1–3 on initial send
   useEffect(() => {
     if (chatPhase === 'confirming') {
       setAgentStep(0)
@@ -134,10 +134,31 @@ export function ActionSpaceSidebarB() {
       const t2 = setTimeout(() => setAgentStep(2), 1000)
       const t3 = setTimeout(() => setAgentStep(3), 2000)
       return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3) }
-    } else {
-      setAgentStep(0)
     }
   }, [chatPhase])
+
+  // Phase 2: animate steps 4–5 after confirmation, then transition to edit
+  useEffect(() => {
+    if (chatPhase === 'processing') {
+      const t4 = setTimeout(() => setAgentStep(4), 400)
+      const t5 = setTimeout(() => setAgentStep(5), 1300)
+      const t6 = setTimeout(() => setAgentStep(6), 2200)
+      return () => { clearTimeout(t4); clearTimeout(t5); clearTimeout(t6) }
+    }
+  }, [chatPhase])
+
+  // Transition to edit space once all steps are done
+  useEffect(() => {
+    if (agentStep === 6) {
+      const tFade = setTimeout(() => setIsTransitioning(true), 400)
+      const tSwitch = setTimeout(() => {
+        setMode('edit')
+        // Preserve chatPhase and agentStep so the conversation is still visible when navigating back
+        requestAnimationFrame(() => requestAnimationFrame(() => setIsTransitioning(false)))
+      }, 1000)
+      return () => { clearTimeout(tFade); clearTimeout(tSwitch) }
+    }
+  }, [agentStep])
 
   function toggleSelectAll() {
     const next = !allChecked
@@ -146,6 +167,10 @@ export function ActionSpaceSidebarB() {
 
   function toggleCheck(id: string) {
     setChecked((prev) => ({ ...prev, [id]: !prev[id] }))
+  }
+
+  function handleYes() {
+    setChatPhase('processing')
   }
 
   const insertSummary = checkedCount === 0
@@ -199,10 +224,17 @@ export function ActionSpaceSidebarB() {
   )
   const sep = <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
 
+  // Step statuses derived from agentStep
+  const step1Status: StepStatus = agentStep === 1 ? 'loading' : 'done'
+  const step2Status: StepStatus = agentStep === 2 ? 'loading' : 'done'
+  const step3Status: StepStatus = agentStep === 3 ? 'waiting' : 'done'
+  const step4Status: StepStatus = agentStep === 4 ? 'loading' : 'done'
+  const step5Status: StepStatus = agentStep === 5 ? 'loading' : 'done'
+
   return (
     <div className="action-space-theme flex h-full w-1/3 shrink-0 flex-col border-l border-border bg-sidebar">
 
-      {/* ── Tab bar ── */}
+      {/* ── Tab bar — always visible ── */}
       <div className="shrink-0 border-b border-border px-3 py-2 flex items-center gap-1 bg-background">
         {tabs.map((tab) => (
           <button
@@ -225,226 +257,276 @@ export function ActionSpaceSidebarB() {
         </div>
       </div>
 
-      {/* ── Heading bar ── */}
-      {mode === 'chat' ? (
-        <div className="shrink-0 border-b border-border px-3 py-2 flex items-center bg-background">
-          <span className="flex-1 text-sm font-medium text-foreground">Chat</span>
-        </div>
-      ) : view === 'main' ? (
-        <div className="shrink-0 border-b border-border px-3 py-2 flex items-center gap-2 bg-background">
-          <div className="flex items-center gap-1 flex-1 min-w-0">
+      {/* ── Everything below the tab bar fades during transition ── */}
+      <div className={cn('flex-1 flex flex-col min-h-0 transition-opacity duration-500', isTransitioning && 'opacity-0')}>
+
+        {/* ── Heading bar ── */}
+        {mode === 'chat' ? (
+          <div className="shrink-0 border-b border-border px-3 py-2 flex items-center bg-background">
+            <span className="flex-1 text-sm font-medium text-foreground">Chat</span>
+          </div>
+        ) : view === 'main' ? (
+          <div className="shrink-0 border-b border-border px-3 py-2 flex items-center gap-2 bg-background">
+            <div className="flex items-center gap-1 flex-1 min-w-0">
+              {chatCrumb}
+              {sep}
+              <span className="text-sm font-medium text-foreground">Edit Space</span>
+            </div>
+            <Button variant="secondary" size="xs" onClick={() => setShowRedline((v) => !v)} className="shrink-0">
+              {showRedline ? 'Hide redline' : 'Show redline'}
+            </Button>
+          </div>
+        ) : (
+          <div className="shrink-0 border-b border-border px-3 py-2 flex items-center gap-1 bg-background">
             {chatCrumb}
             {sep}
-            <span className="text-sm font-medium text-foreground">Edit Space</span>
+            {editSpaceCrumb}
+            {sep}
+            <span className="text-sm font-medium text-foreground">Definitions</span>
           </div>
-          <Button variant="secondary" size="xs" onClick={() => setShowRedline((v) => !v)} className="shrink-0">
-            {showRedline ? 'Hide redline' : 'Show redline'}
-          </Button>
-        </div>
-      ) : (
-        <div className="shrink-0 border-b border-border px-3 py-2 flex items-center gap-1 bg-background">
-          {chatCrumb}
-          {sep}
-          {editSpaceCrumb}
-          {sep}
-          <span className="text-sm font-medium text-foreground">Definitions</span>
-        </div>
-      )}
+        )}
 
-      {/* ── Chat mode ── */}
-      {mode === 'chat' && (
-        <>
-          {/* Thread area */}
-          <div className="flex-1 overflow-y-auto min-h-0 px-3 py-3 flex flex-col gap-3">
-            {chatPhase === 'confirming' && (
-              <>
-                {/* User message */}
-                <div className="flex justify-end">
-                  <div className="w-full rounded-xl rounded-tr-sm bg-[#B8C1DE] text-foreground px-3 py-2 text-[13px] leading-relaxed">
-                    Pull a limitation of liability clause for a SaaS agreement from Vault
+        {/* ── Chat mode ── */}
+        {mode === 'chat' && (
+          <>
+            <div className="flex-1 overflow-y-auto min-h-0 px-3 py-3 flex flex-col gap-3">
+              {chatPhase !== 'idle' && (
+                <>
+                  {/* User message */}
+                  <div className="flex justify-end">
+                    <div className="w-full rounded-xl rounded-tr-sm bg-[#B8C1DE] text-foreground px-3 py-2 text-[13px] leading-relaxed">
+                      Pull a limitation of liability clause for a SaaS agreement from Vault
+                    </div>
+                  </div>
+
+                  {/* Agent timeline card */}
+                  {agentStep >= 1 && (
+                    <div className="w-full rounded-xl border border-border bg-background p-3 flex flex-col">
+                      <TimelineStep
+                        status={step1Status}
+                        label="Checking Vault access"
+                        description="Verifying you have access to Vault."
+                        showConnector={agentStep >= 2}
+                      />
+                      {agentStep >= 2 && (
+                        <TimelineStep
+                          status={step2Status}
+                          label="Searching for SaaS agreements"
+                          description="Looking for SaaS agreements in your personal Vault."
+                          showConnector={agentStep >= 3}
+                        />
+                      )}
+                      {agentStep >= 3 && (
+                        <TimelineStep
+                          status={step3Status}
+                          label="Confirmation required"
+                          description={agentStep === 3 ? 'Found 3 agreements. See below to confirm.' : 'You confirmed 3 agreements.'}
+                          showConnector={agentStep >= 4}
+                        />
+                      )}
+                      {agentStep >= 4 && (
+                        <TimelineStep
+                          status={step4Status}
+                          label="Extracting Limitation of Liability clause"
+                          description="Scanning the 3 agreements for relevant clauses."
+                          showConnector={agentStep >= 5}
+                        />
+                      )}
+                      {agentStep >= 5 && (
+                        <TimelineStep
+                          status={step5Status}
+                          label="Drafting redline edit"
+                          description="Adapting the clause for your working document."
+                          showConnector={false}
+                        />
+                      )}
+                    </div>
+                  )}
+
+                  {/* Edit Space entry card — shown once all steps are done */}
+                  {agentStep >= 6 && (
+                    <button
+                      onClick={() => setMode('edit')}
+                      className="w-full rounded-xl border border-border bg-background px-3 py-3 flex items-center justify-between hover:bg-accent transition-colors group"
+                    >
+                      <span className="text-[13px] font-medium text-foreground">Working on the Edit Space</span>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0 group-hover:translate-x-0.5 transition-transform" />
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Sticky bottom */}
+            <div className="shrink-0 border-t border-border flex flex-col bg-background">
+
+              {/* Confirmation card — only during confirming phase, after step 3 */}
+              {chatPhase === 'confirming' && agentStep >= 3 && (
+                <div className="px-3 pt-3 pb-2">
+                  <div className="rounded border border-border bg-[#d3d9eb] px-3 py-3 flex flex-col gap-3">
+                    <p className="text-[13px] leading-[20px]">
+                      I found the following SaaS agreements in your personal Vault. Would it be okay to use these to find a Limitation of Liability clause?
+                    </p>
+                    <div className="flex flex-col gap-1.5">
+                      {saasAgreements.map((name) => (
+                        <button
+                          key={name}
+                          className="text-[13px] leading-[18px] text-primary underline underline-offset-2 text-left hover:opacity-80 transition-opacity"
+                        >
+                          {name}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex flex-col items-start gap-2">
+                      <Button variant="default" size="xs" onClick={handleYes}>Yes</Button>
+                      <Button variant="secondary" size="xs" onClick={() => setChatPhase('idle')}>No</Button>
+                      <Button variant="ghost" size="xs" onClick={() => setChatPhase('idle')}>Type something else</Button>
+                    </div>
                   </div>
                 </div>
+              )}
 
-                {/* Agent timeline card */}
-                {agentStep >= 1 && (
-                  <div className="w-full rounded-xl border border-border bg-background p-3 flex flex-col">
-                    <TimelineStep
-                      status={agentStep === 1 ? 'loading' : 'done'}
-                      label="Checking Vault access"
-                      description="Verifying you have access to Vault."
-                      showConnector={agentStep >= 2}
-                    />
-                    {agentStep >= 2 && (
-                      <TimelineStep
-                        status={agentStep === 2 ? 'loading' : 'done'}
-                        label="Searching for SaaS agreements"
-                        description="Looking for SaaS agreements in your personal Vault."
-                        showConnector={agentStep >= 3}
-                      />
-                    )}
-                    {agentStep >= 3 && (
-                      <TimelineStep
-                        status="waiting"
-                        label="Confirmation required"
-                        description="Found 3 agreements. See below to confirm."
-                        showConnector={false}
-                      />
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* Sticky bottom */}
-          <div className="shrink-0 border-t border-border flex flex-col bg-background">
-
-            {/* Confirmation card */}
-            {chatPhase === 'confirming' && agentStep >= 3 && (
-              <div className="px-3 pt-3 pb-2">
-                <div className="rounded border border-border bg-[#d3d9eb] px-3 py-3 flex flex-col gap-3">
-                  <p className="text-[13px] leading-[20px]">
-                    I found the following SaaS agreements in your personal Vault. Would it be okay to use these to find a Limitation of Liability clause?
-                  </p>
-                  <div className="flex flex-col gap-1.5">
-                    {saasAgreements.map((name) => (
-                      <button
-                        key={name}
-                        className="text-[13px] leading-[18px] text-primary underline underline-offset-2 text-left hover:opacity-80 transition-opacity"
-                      >
-                        {name}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="flex flex-col items-start gap-2">
-                    <Button variant="default" size="xs">Yes</Button>
-                    <Button variant="secondary" size="xs" onClick={() => setChatPhase('idle')}>No</Button>
-                    <Button variant="ghost" size="xs" onClick={() => setChatPhase('idle')}>Type something else</Button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Chat input */}
-            <div className="px-3 py-3">
-              <ChatInput onSend={() => setChatPhase('confirming')} placeholder="Ask Enhance" rows={2} />
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* ── Enhance: main view ── */}
-      {mode === 'edit' && activeTab === 'enhance' && view === 'main' && (
-        <>
-          <div className="flex-1 overflow-hidden flex flex-col min-h-0">
-            <div className="flex-1 overflow-y-auto min-h-0">
-              <ClauseCardFlat showRedline={showRedline} />
-            </div>
-          </div>
-
-          <div className="shrink-0 border-t border-border flex flex-col bg-background">
-            <div className="px-3 pt-3 pb-2">
-              <div className="rounded border border-border bg-[#d3d9eb] px-3 py-2.5 flex flex-col gap-1">
-                <button
-                  onClick={() => setReasonExpanded((v) => !v)}
-                  className="flex items-center gap-3 text-left w-full"
-                >
-                  <p className="flex-1 text-[14px] font-medium leading-[20px] text-muted-foreground">Reason for change</p>
-                  {reasonExpanded
-                    ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                  }
-                </button>
-                {reasonExpanded && (
-                  <p className="text-[14px] leading-[20px]">
-                    These changes would narrow the Borrower's authorisation without materially departing from market-standard LMA risk allocation, while providing protection against defective or fraudulent claims.
-                  </p>
-                )}
+              <div className="px-3 py-3">
+                <ChatInput onSend={() => setChatPhase('confirming')} placeholder="Ask Enhance" rows={2} />
               </div>
             </div>
+          </>
+        )}
 
-            <div className="px-3 pt-1 pb-3">
-              <button
-                onClick={() => setView('definitions')}
-                className="group w-full text-left rounded border border-border bg-[#d3d9eb] px-3 py-2.5 flex items-start gap-3 hover:bg-[#c8d0e8] transition-colors"
+        {/* ── Enhance: main view ── */}
+        {mode === 'edit' && activeTab === 'enhance' && view === 'main' && (
+          <>
+            <motion.div
+              className="flex-1 overflow-hidden flex flex-col min-h-0"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3, ease: 'easeOut', delay: 0.05 }}
+            >
+              <div className="flex-1 overflow-y-auto min-h-0">
+                <ClauseCardFlat showRedline={showRedline} />
+              </div>
+            </motion.div>
+
+            <div className="shrink-0 border-t border-border flex flex-col bg-background">
+              <motion.div
+                className="px-3 pt-3 pb-2"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, ease: 'easeOut', delay: 0.15 }}
               >
+                <div className="rounded border border-border bg-[#d3d9eb] px-3 py-2.5 flex flex-col gap-1">
+                  <button
+                    onClick={() => setReasonExpanded((v) => !v)}
+                    className="flex items-center gap-3 text-left w-full"
+                  >
+                    <p className="flex-1 text-[14px] font-medium leading-[20px] text-muted-foreground">Reason for change</p>
+                    {reasonExpanded
+                      ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    }
+                  </button>
+                  {reasonExpanded && (
+                    <p className="text-[14px] leading-[20px]">
+                      These changes would narrow the Borrower's authorisation without materially departing from market-standard LMA risk allocation, while providing protection against defective or fraudulent claims.
+                    </p>
+                  )}
+                </div>
+              </motion.div>
+
+              <motion.div
+                className="px-3 pt-1 pb-3"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, ease: 'easeOut', delay: 0.25 }}
+              >
+                <button
+                  onClick={() => setView('definitions')}
+                  className="group w-full text-left rounded border border-border bg-[#d3d9eb] px-3 py-2.5 flex items-start gap-3 hover:bg-[#c8d0e8] transition-colors"
+                >
+                  <div className="flex-1 flex flex-col gap-1">
+                    <p className="text-[14px] font-medium leading-[20px] text-muted-foreground">Definitions</p>
+                    <p className="text-[14px] leading-[20px]">
+                      The following definitions resolve terms introduced by this clause. AI-drafted ones are a first draft — review them on the document after inserting.
+                    </p>
+                  </div>
+                  <div className="shrink-0 flex items-center gap-1 mt-0.5 text-muted-foreground">
+                    <span className="text-[13px] font-medium opacity-0 group-hover:opacity-100 transition-opacity">Open</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </div>
+                </button>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, ease: 'easeOut', delay: 0.35 }}
+              >
+                {footer}
+              </motion.div>
+            </div>
+          </>
+        )}
+
+        {/* ── Enhance: definitions view ── */}
+        {mode === 'edit' && activeTab === 'enhance' && view === 'definitions' && (
+          <>
+            <div className="flex-1 overflow-y-auto min-h-0 px-3 pt-3 pb-3 flex flex-col gap-3">
+              <div className="flex items-start gap-3">
                 <div className="flex-1 flex flex-col gap-1">
-                  <p className="text-[14px] font-medium leading-[20px] text-muted-foreground">Definitions</p>
-                  <p className="text-[14px] leading-[20px]">
+                  <p className="text-[14px] font-semibold leading-[20px] text-muted-foreground">Definitions</p>
+                  <p className="text-[14px] text-muted-foreground leading-[20px]">
                     The following definitions resolve terms introduced by this clause. AI-drafted ones are a first draft — review them on the document after inserting.
                   </p>
                 </div>
-                <div className="shrink-0 flex items-center gap-1 mt-0.5 text-muted-foreground">
-                  <span className="text-[13px] font-medium opacity-0 group-hover:opacity-100 transition-opacity">Open</span>
-                  <ArrowRight className="h-4 w-4" />
+                <div className="shrink-0">
+                  <Button variant="secondary" size="xs" onClick={toggleSelectAll}>
+                    {allChecked ? 'Deselect all' : 'Select all'}
+                  </Button>
                 </div>
-              </button>
-            </div>
-
-            {footer}
-          </div>
-        </>
-      )}
-
-      {/* ── Enhance: definitions view ── */}
-      {mode === 'edit' && activeTab === 'enhance' && view === 'definitions' && (
-        <>
-          <div className="flex-1 overflow-y-auto min-h-0 px-3 pt-3 pb-3 flex flex-col gap-3">
-            <div className="flex items-start gap-3">
-              <div className="flex-1 flex flex-col gap-1">
-                <p className="text-[14px] font-semibold leading-[20px] text-muted-foreground">Definitions</p>
-                <p className="text-[14px] text-muted-foreground leading-[20px]">
-                  The following definitions resolve terms introduced by this clause. AI-drafted ones are a first draft — review them on the document after inserting.
-                </p>
               </div>
-              <div className="shrink-0">
-                <Button variant="secondary" size="xs" onClick={toggleSelectAll}>
-                  {allChecked ? 'Deselect all' : 'Select all'}
-                </Button>
-              </div>
-            </div>
-            <div className="flex flex-col">
-              {definitions.map((def, i) => (
-                <div
-                  key={def.id}
-                  className={cn(
-                    'grid grid-cols-4 gap-x-3 py-3',
-                    i < definitions.length - 1 && 'border-b border-border'
-                  )}
-                >
-                  <div className="col-span-3 flex items-start gap-2">
-                    <Checkbox
-                      checked={checked[def.id]}
-                      onCheckedChange={() => toggleCheck(def.id)}
-                      className="mt-1"
-                    />
-                    <div className="flex flex-col gap-0.5 min-w-0">
-                      <span className="text-[14px] font-medium leading-[20px]">{def.label}</span>
-                      <p className="text-[14px] text-muted-foreground leading-[20px]">{def.description}</p>
+              <div className="flex flex-col">
+                {definitions.map((def, i) => (
+                  <div
+                    key={def.id}
+                    className={cn(
+                      'grid grid-cols-4 gap-x-3 py-3',
+                      i < definitions.length - 1 && 'border-b border-border'
+                    )}
+                  >
+                    <div className="col-span-3 flex items-start gap-2">
+                      <Checkbox
+                        checked={checked[def.id]}
+                        onCheckedChange={() => toggleCheck(def.id)}
+                        className="mt-1"
+                      />
+                      <div className="flex flex-col gap-0.5 min-w-0">
+                        <span className="text-[14px] font-medium leading-[20px]">{def.label}</span>
+                        <p className="text-[14px] text-muted-foreground leading-[20px]">{def.description}</p>
+                      </div>
+                    </div>
+                    <div className="col-span-1 flex justify-end pt-0.5">
+                      <SourceBadge source={def.source} />
                     </div>
                   </div>
-                  <div className="col-span-1 flex justify-end pt-0.5">
-                    <SourceBadge source={def.source} />
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-          <div className="shrink-0 border-t border-border flex flex-col bg-background">
-            {footer}
-          </div>
-        </>
-      )}
+            <div className="shrink-0 border-t border-border flex flex-col bg-background">
+              {footer}
+            </div>
+          </>
+        )}
 
-      {/* ── Non-enhance tabs ── */}
-      {mode === 'edit' && activeTab !== 'enhance' && (
-        <div className="flex-1 overflow-y-auto px-3 py-3 min-h-0">
-          <p className="text-sm text-muted-foreground">
-            {tabs.find((t) => t.id === activeTab)?.label} — coming soon
-          </p>
-        </div>
-      )}
+        {/* ── Non-enhance tabs ── */}
+        {mode === 'edit' && activeTab !== 'enhance' && (
+          <div className="flex-1 overflow-y-auto px-3 py-3 min-h-0">
+            <p className="text-sm text-muted-foreground">
+              {tabs.find((t) => t.id === activeTab)?.label} — coming soon
+            </p>
+          </div>
+        )}
 
+      </div>
     </div>
   )
 }
