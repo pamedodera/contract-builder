@@ -14,9 +14,10 @@ const promptLibrary = [
 
 interface ChatInputProps {
   onSend: (text: string) => void
+  placeholder?: string
 }
 
-export function ChatInput({ onSend }: ChatInputProps) {
+export function ChatInput({ onSend, placeholder = 'Ask the AI assistant…' }: ChatInputProps) {
   const [value, setValue] = useState('')
   const [popoverOpen, setPopoverOpen] = useState(false)
   const [focused, setFocused] = useState(false)
@@ -57,7 +58,7 @@ export function ChatInput({ onSend }: ChatInputProps) {
         onKeyDown={handleKeyDown}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        placeholder="Ask the AI assistant…"
+        placeholder={placeholder}
         rows={1}
         className="flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
       />

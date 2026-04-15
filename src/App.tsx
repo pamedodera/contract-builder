@@ -2,11 +2,13 @@ import { useState } from 'react'
 import { Sidebar } from '@/components/sidebar/Sidebar'
 import { ReviewSidebar } from '@/components/review/ReviewSidebar'
 import { DefinelySidebar } from '@/components/review/DefinelySidebar'
+import { ActionSpaceSidebar } from '@/components/action-space/ActionSpaceSidebar'
 import { DocumentViewer } from '@/components/document/DocumentViewer'
 import { cn } from '@/lib/utils'
 
 const flows = [
-  { id: 'definely-brand', label: 'Definely' },
+  { id: 'definely-brand', label: 'Future Proposals' },
+  { id: 'action-space', label: 'Actions Flow' },
 ]
 
 function App() {
@@ -61,6 +63,14 @@ function App() {
               <DocumentViewer onTermClick={() => {}} />
             </main>
             <DefinelySidebar />
+          </>
+        )}
+        {activeFlow === 'action-space' && (
+          <>
+            <main className="flex w-2/3 overflow-hidden">
+              <DocumentViewer onTermClick={() => {}} />
+            </main>
+            <ActionSpaceSidebar />
           </>
         )}
       </div>
