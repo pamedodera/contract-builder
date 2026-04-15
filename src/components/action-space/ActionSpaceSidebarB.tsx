@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
-import { Plus, X, ChevronDown, ChevronRight, ArrowRight } from 'lucide-react'
+import { Plus, ChevronDown, ChevronRight, ArrowRight, Check, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -10,6 +10,9 @@ import { ClauseCardFlat } from './ClauseCardFlat'
 
 type Tab = 'vault' | 'draft' | 'proof' | 'cascade' | 'enhance'
 type View = 'main' | 'definitions'
+type Mode = 'edit' | 'chat'
+type ChatPhase = 'idle' | 'confirming'
+type StepStatus = 'loading' | 'done' | 'waiting'
 
 const tabs: { id: Tab; label: string }[] = [
   { id: 'vault', label: 'Vault' },
@@ -18,8 +21,6 @@ const tabs: { id: Tab; label: string }[] = [
   { id: 'cascade', label: 'Cascade' },
   { id: 'enhance', label: 'Enhance' },
 ]
-
-const CLAUSE_NAME = 'Letters of Credit – Authorisation'
 
 type Source = { type: 'precedent'; name: string } | { type: 'ai' }
 
@@ -50,6 +51,12 @@ const definitions: { id: string; label: string; description: string; source: Sou
   },
 ]
 
+const saasAgreements = [
+  'Salesforce Order Form – MSA 2023',
+  'HubSpot Enterprise SaaS Agreement 2022',
+  'Stripe Merchant Services Agreement 2023',
+]
+
 function SourceBadge({ source }: { source: Source }) {
   const base = 'bg-gray-200 border-transparent text-gray-600 font-normal'
   if (source.type === 'precedent') {
@@ -66,9 +73,49 @@ function SourceBadge({ source }: { source: Source }) {
   return <Badge variant="secondary" className={base}>AI Generated</Badge>
 }
 
+function TimelineStep({
+  status,
+  label,
+  description,
+  showConnector,
+}: {
+  status: StepStatus
+  label: string
+  description: string
+  showConnector: boolean
+}) {
+  return (
+    <div className="flex gap-3">
+      {/* Icon + connector */}
+      <div className="flex flex-col items-center">
+        {status === 'done' && (
+          <div className="mt-0.5 h-4 w-4 shrink-0 rounded-full bg-green-100 flex items-center justify-center">
+            <Check className="h-2.5 w-2.5 text-green-600" />
+          </div>
+        )}
+        {status === 'loading' && (
+          <Loader2 className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground animate-spin" />
+        )}
+        {status === 'waiting' && (
+          <div className="mt-0.5 h-4 w-4 shrink-0 rounded-full border border-muted-foreground" />
+        )}
+        {showConnector && <div className="w-px bg-border flex-1 mt-1" />}
+      </div>
+      {/* Content */}
+      <div className={cn('flex flex-col gap-0.5 min-w-0', showConnector && 'pb-3')}>
+        <span className="text-[13px] font-medium leading-[18px] text-foreground">{label}</span>
+        <p className="text-[12px] text-muted-foreground leading-[16px]">{description}</p>
+      </div>
+    </div>
+  )
+}
+
 export function ActionSpaceSidebarB() {
   const [activeTab, setActiveTab] = useState<Tab>('enhance')
   const [view, setView] = useState<View>('main')
+  const [mode, setMode] = useState<Mode>('edit')
+  const [chatPhase, setChatPhase] = useState<ChatPhase>('idle')
+  const [agentStep, setAgentStep] = useState(0)
   const [menuOpen, setMenuOpen] = useState(false)
   const [reasonExpanded, setReasonExpanded] = useState(false)
   const [showRedline, setShowRedline] = useState(true)
@@ -78,6 +125,19 @@ export function ActionSpaceSidebarB() {
 
   const allChecked = definitions.every((d) => checked[d.id])
   const checkedCount = definitions.filter((d) => checked[d.id]).length
+
+  // Animate agent steps when chat phase starts
+  useEffect(() => {
+    if (chatPhase === 'confirming') {
+      setAgentStep(0)
+      const t1 = setTimeout(() => setAgentStep(1), 100)
+      const t2 = setTimeout(() => setAgentStep(2), 1000)
+      const t3 = setTimeout(() => setAgentStep(3), 2000)
+      return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3) }
+    } else {
+      setAgentStep(0)
+    }
+  }, [chatPhase])
 
   function toggleSelectAll() {
     const next = !allChecked
@@ -121,6 +181,24 @@ export function ActionSpaceSidebarB() {
     </div>
   )
 
+  const chatCrumb = (
+    <button
+      onClick={() => { setMode('chat'); setView('main') }}
+      className="text-sm text-muted-foreground hover:text-foreground transition-colors shrink-0"
+    >
+      Chat
+    </button>
+  )
+  const editSpaceCrumb = (
+    <button
+      onClick={() => setView('main')}
+      className="text-sm text-muted-foreground hover:text-foreground transition-colors shrink-0"
+    >
+      Edit Space
+    </button>
+  )
+  const sep = <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+
   return (
     <div className="action-space-theme flex h-full w-1/3 shrink-0 flex-col border-l border-border bg-sidebar">
 
@@ -147,49 +225,124 @@ export function ActionSpaceSidebarB() {
         </div>
       </div>
 
-      {/* ── Heading bar — changes based on view ── */}
-      {view === 'main' ? (
-        <div className="shrink-0 border-b border-border px-3 pt-2 pb-2.5 flex flex-col gap-1 bg-background">
-          <div className="flex items-center gap-2">
-            <span className="flex-1 text-sm font-medium text-foreground">Edit Space</span>
-            <Button variant="secondary" size="xs" onClick={() => setShowRedline((v) => !v)}>
-              {showRedline ? 'Hide redline' : 'Show redline'}
-            </Button>
-            <Button variant="ghost" size="icon-sm" aria-label="Close">
-              <X className="h-3.5 w-3.5" />
-            </Button>
+      {/* ── Heading bar ── */}
+      {mode === 'chat' ? (
+        <div className="shrink-0 border-b border-border px-3 py-2 flex items-center bg-background">
+          <span className="flex-1 text-sm font-medium text-foreground">Chat</span>
+        </div>
+      ) : view === 'main' ? (
+        <div className="shrink-0 border-b border-border px-3 py-2 flex items-center gap-2 bg-background">
+          <div className="flex items-center gap-1 flex-1 min-w-0">
+            {chatCrumb}
+            {sep}
+            <span className="text-sm font-medium text-foreground">Edit Space</span>
           </div>
-          <p className="text-[13px] text-muted-foreground leading-[18px]">
-            Pull a limitation of liability clause for a SaaS agreement from Vault and drop it into my working document.
-          </p>
+          <Button variant="secondary" size="xs" onClick={() => setShowRedline((v) => !v)} className="shrink-0">
+            {showRedline ? 'Hide redline' : 'Show redline'}
+          </Button>
         </div>
       ) : (
         <div className="shrink-0 border-b border-border px-3 py-2 flex items-center gap-1 bg-background">
-          <button
-            onClick={() => setView('main')}
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Edit Space
-          </button>
-          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          {chatCrumb}
+          {sep}
+          {editSpaceCrumb}
+          {sep}
           <span className="text-sm font-medium text-foreground">Definitions</span>
         </div>
       )}
 
-      {/* ── Enhance: main view ── */}
-      {activeTab === 'enhance' && view === 'main' && (
+      {/* ── Chat mode ── */}
+      {mode === 'chat' && (
         <>
-          {/* Clause body — fills available space, scrolls internally */}
+          {/* Thread area */}
+          <div className="flex-1 overflow-y-auto min-h-0 px-3 py-3 flex flex-col gap-3">
+            {chatPhase === 'confirming' && (
+              <>
+                {/* User message */}
+                <div className="flex justify-end">
+                  <div className="w-full rounded-xl rounded-tr-sm bg-[#B8C1DE] text-foreground px-3 py-2 text-[13px] leading-relaxed">
+                    Pull a limitation of liability clause for a SaaS agreement from Vault
+                  </div>
+                </div>
+
+                {/* Agent timeline card */}
+                {agentStep >= 1 && (
+                  <div className="w-full rounded-xl border border-border bg-background p-3 flex flex-col">
+                    <TimelineStep
+                      status={agentStep === 1 ? 'loading' : 'done'}
+                      label="Checking Vault access"
+                      description="Verifying you have access to Vault."
+                      showConnector={agentStep >= 2}
+                    />
+                    {agentStep >= 2 && (
+                      <TimelineStep
+                        status={agentStep === 2 ? 'loading' : 'done'}
+                        label="Searching for SaaS agreements"
+                        description="Looking for SaaS agreements in your personal Vault."
+                        showConnector={agentStep >= 3}
+                      />
+                    )}
+                    {agentStep >= 3 && (
+                      <TimelineStep
+                        status="waiting"
+                        label="Confirmation required"
+                        description="Found 3 agreements. See below to confirm."
+                        showConnector={false}
+                      />
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Sticky bottom */}
+          <div className="shrink-0 border-t border-border flex flex-col bg-background">
+
+            {/* Confirmation card */}
+            {chatPhase === 'confirming' && agentStep >= 3 && (
+              <div className="px-3 pt-3 pb-2">
+                <div className="rounded border border-border bg-[#d3d9eb] px-3 py-3 flex flex-col gap-3">
+                  <p className="text-[13px] leading-[20px]">
+                    I found the following SaaS agreements in your personal Vault. Would it be okay to use these to find a Limitation of Liability clause?
+                  </p>
+                  <div className="flex flex-col gap-1.5">
+                    {saasAgreements.map((name) => (
+                      <button
+                        key={name}
+                        className="text-[13px] leading-[18px] text-primary underline underline-offset-2 text-left hover:opacity-80 transition-opacity"
+                      >
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex flex-col items-start gap-2">
+                    <Button variant="default" size="xs">Yes</Button>
+                    <Button variant="secondary" size="xs" onClick={() => setChatPhase('idle')}>No</Button>
+                    <Button variant="ghost" size="xs" onClick={() => setChatPhase('idle')}>Type something else</Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Chat input */}
+            <div className="px-3 py-3">
+              <ChatInput onSend={() => setChatPhase('confirming')} placeholder="Ask Enhance" rows={2} />
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── Enhance: main view ── */}
+      {mode === 'edit' && activeTab === 'enhance' && view === 'main' && (
+        <>
           <div className="flex-1 overflow-hidden flex flex-col min-h-0">
             <div className="flex-1 overflow-y-auto min-h-0">
               <ClauseCardFlat showRedline={showRedline} />
             </div>
           </div>
 
-          {/* Sticky bottom */}
-          <div className="shrink-0 border-t border-border flex flex-col">
-
-            {/* Reason for change (collapsible) */}
+          <div className="shrink-0 border-t border-border flex flex-col bg-background">
             <div className="px-3 pt-3 pb-2">
               <div className="rounded border border-border bg-[#d3d9eb] px-3 py-2.5 flex flex-col gap-1">
                 <button
@@ -210,7 +363,6 @@ export function ActionSpaceSidebarB() {
               </div>
             </div>
 
-            {/* Definitions collapsed card */}
             <div className="px-3 pt-1 pb-3">
               <button
                 onClick={() => setView('definitions')}
@@ -235,7 +387,7 @@ export function ActionSpaceSidebarB() {
       )}
 
       {/* ── Enhance: definitions view ── */}
-      {activeTab === 'enhance' && view === 'definitions' && (
+      {mode === 'edit' && activeTab === 'enhance' && view === 'definitions' && (
         <>
           <div className="flex-1 overflow-y-auto min-h-0 px-3 pt-3 pb-3 flex flex-col gap-3">
             <div className="flex items-start gap-3">
@@ -278,25 +430,20 @@ export function ActionSpaceSidebarB() {
               ))}
             </div>
           </div>
-          <div className="shrink-0 border-t border-border flex flex-col">
+          <div className="shrink-0 border-t border-border flex flex-col bg-background">
             {footer}
           </div>
         </>
       )}
 
       {/* ── Non-enhance tabs ── */}
-      {activeTab !== 'enhance' && (
+      {mode === 'edit' && activeTab !== 'enhance' && (
         <div className="flex-1 overflow-y-auto px-3 py-3 min-h-0">
           <p className="text-sm text-muted-foreground">
             {tabs.find((t) => t.id === activeTab)?.label} — coming soon
           </p>
         </div>
       )}
-
-      {/* ── Chat input ── */}
-      <div className="shrink-0 border-t border-border px-3 py-3">
-        <ChatInput onSend={() => {}} placeholder="Ask Enhance" />
-      </div>
 
     </div>
   )
