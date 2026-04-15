@@ -118,8 +118,8 @@ function TimelineStep({
         {showConnector && <div className="w-px bg-border flex-1 mt-1" />}
       </div>
       <div className={cn('flex flex-col gap-0.5 min-w-0', showConnector && 'pb-3')}>
-        <span className="text-[13px] font-medium leading-[18px] text-foreground">{label}</span>
-        <p className="text-[12px] text-muted-foreground leading-[16px]">{description}</p>
+        <span className="text-[16px] font-medium leading-[20px] text-foreground">{label}</span>
+        <p className="text-[14px] text-muted-foreground leading-[18px]">{description}</p>
       </div>
     </div>
   )
@@ -167,32 +167,32 @@ function InsertItemCard({
       <div className="flex-1 flex flex-col gap-0.5 min-w-0">
         {item.status === 'pending' && (
           <>
-            <span className="text-[13px] font-medium text-muted-foreground">{typeLabel} queued</span>
-            <span className="text-[12px] text-muted-foreground truncate">"{item.label}"</span>
+            <span className="text-[16px] font-medium text-muted-foreground">{typeLabel} queued</span>
+            <span className="text-[14px] text-muted-foreground truncate">"{item.label}"</span>
           </>
         )}
         {item.status === 'inserting' && (
           <>
-            <span className="text-[13px] font-medium">Inserting {typeLabel.toLowerCase()}</span>
-            <span className="text-[12px] text-muted-foreground">"{item.label}" · {item.location}</span>
+            <span className="text-[16px] font-medium">Inserting {typeLabel.toLowerCase()}</span>
+            <span className="text-[14px] text-muted-foreground">"{item.label}" · {item.location}</span>
           </>
         )}
         {item.status === 'inserted' && (
           <>
-            <span className="text-[13px] font-medium">{typeLabel} inserted</span>
-            <span className="text-[12px] text-muted-foreground">"{item.label}" · {item.location}</span>
+            <span className="text-[16px] font-medium">{typeLabel} inserted</span>
+            <span className="text-[14px] text-muted-foreground">"{item.label}" · {item.location}</span>
           </>
         )}
         {item.status === 'undone' && (
           <>
-            <span className="text-[13px] font-medium text-muted-foreground">{typeLabel} removed</span>
-            <span className="text-[12px] text-muted-foreground">"{item.label}"</span>
+            <span className="text-[16px] font-medium text-muted-foreground">{typeLabel} removed</span>
+            <span className="text-[14px] text-muted-foreground">"{item.label}"</span>
           </>
         )}
         {item.status === 'cancelled' && (
           <>
-            <span className="text-[13px] font-medium text-muted-foreground">{typeLabel} not inserted</span>
-            <span className="text-[12px] text-muted-foreground">"{item.label}"</span>
+            <span className="text-[16px] font-medium text-muted-foreground">{typeLabel} not inserted</span>
+            <span className="text-[14px] text-muted-foreground">"{item.label}"</span>
           </>
         )}
       </div>
@@ -217,10 +217,174 @@ function InsertItemCard({
   )
 }
 
+function DefinitionTimelineItem({
+  item,
+  showConnector,
+  onUndo,
+}: {
+  item: InsertItem
+  showConnector: boolean
+  onUndo: (id: string) => void
+}) {
+  return (
+    <div className="flex gap-3">
+      <div className="flex flex-col items-center shrink-0">
+        <div className="mt-0.5">
+          {item.status === 'pending' && (
+            <div className="h-4 w-4 rounded-full border border-muted-foreground/40" />
+          )}
+          {item.status === 'inserting' && (
+            <Loader2 className="h-4 w-4 text-muted-foreground animate-spin" />
+          )}
+          {item.status === 'inserted' && (
+            <div className="h-4 w-4 rounded-full bg-green-100 flex items-center justify-center">
+              <Check className="h-2.5 w-2.5 text-green-600" />
+            </div>
+          )}
+          {(item.status === 'undone' || item.status === 'cancelled') && (
+            <div className="h-4 w-4 rounded-full border border-muted-foreground/30" />
+          )}
+        </div>
+        {showConnector && <div className="w-px bg-border flex-1 mt-1" />}
+      </div>
+      <div className={cn('flex items-start justify-between flex-1 min-w-0', showConnector && 'pb-3')}>
+        <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+          <span className={cn(
+            'text-[16px] font-medium leading-[20px]',
+            (item.status === 'pending' || item.status === 'undone' || item.status === 'cancelled') && 'text-muted-foreground'
+          )}>
+            {item.label}
+          </span>
+          {(item.status === 'inserting' || item.status === 'inserted') && (
+            <span className="text-[14px] text-muted-foreground">{item.location}</span>
+          )}
+          {item.status === 'undone' && (
+            <span className="text-[14px] text-muted-foreground">Removed</span>
+          )}
+        </div>
+        {item.status === 'inserted' && (
+          <Button variant="ghost" size="xs" onClick={() => onUndo(item.id)} className="shrink-0 ml-2">
+            Undo
+          </Button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function DefinitionGroupCard({
+  items,
+  insertPhase,
+  onStop,
+  onUndo,
+  onUndoAll,
+}: {
+  items: InsertItem[]
+  insertPhase: InsertPhase
+  onStop: () => void
+  onUndo: (id: string) => void
+  onUndoAll: () => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+
+  const isLoading =
+    items.some((i) => i.status === 'inserting') ||
+    (items.some((i) => i.status === 'pending') && insertPhase === 'running')
+  const insertedCount = items.filter((i) => i.status === 'inserted').length
+  const anyInserted = insertedCount > 0
+  const allSettled = items.every((i) => ['inserted', 'undone', 'cancelled'].includes(i.status))
+
+  return (
+    <div className="w-full rounded-xl border border-border bg-background overflow-hidden">
+      {/* Header row */}
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full flex items-center gap-3 p-3 hover:bg-accent transition-colors text-left"
+      >
+        {/* Status icon */}
+        <div className="mt-0.5 shrink-0">
+          {isLoading ? (
+            <Loader2 className="h-4 w-4 text-muted-foreground animate-spin" />
+          ) : anyInserted ? (
+            <div className="h-4 w-4 rounded-full bg-green-100 flex items-center justify-center">
+              <Check className="h-2.5 w-2.5 text-green-600" />
+            </div>
+          ) : (
+            <div className="h-4 w-4 rounded-full border border-muted-foreground/40" />
+          )}
+        </div>
+
+        {/* Title */}
+        <div className="flex-1 flex flex-col gap-0.5 min-w-0">
+          <span className="text-[16px] font-medium">
+            {!isLoading && allSettled && anyInserted
+              ? `${insertedCount} ${insertedCount === 1 ? 'Definition' : 'Definitions'} inserted`
+              : `${items.length} Definitions`}
+          </span>
+          {isLoading && (
+            <span className="text-[14px] text-muted-foreground">Inserting definitions…</span>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-1 shrink-0">
+          {isLoading && (
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={(e) => { e.stopPropagation(); onStop() }}
+              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+            >
+              Stop
+            </Button>
+          )}
+          {!isLoading && anyInserted && (
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={(e) => { e.stopPropagation(); onUndoAll() }}
+            >
+              Undo all
+            </Button>
+          )}
+          {expanded
+            ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
+            : <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          }
+        </div>
+      </button>
+
+      {/* Expanded timeline */}
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: 'easeInOut' }}
+            style={{ overflow: 'hidden' }}
+          >
+            <div className="border-t border-border p-3 flex flex-col">
+              {items.map((item, i) => (
+                <DefinitionTimelineItem
+                  key={item.id}
+                  item={item}
+                  showConnector={i < items.length - 1}
+                  onUndo={onUndo}
+                />
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 export function ActionSpaceSidebarB() {
   const [activeTab, setActiveTab] = useState<Tab>('enhance')
   const [view, setView] = useState<View>('main')
-  const [mode, setMode] = useState<Mode>('edit')
+  const [mode, setMode] = useState<Mode>('chat')
   const [chatPhase, setChatPhase] = useState<ChatPhase>('idle')
   const [agentStep, setAgentStep] = useState(0)
   const [isTransitioning, setIsTransitioning] = useState(false)
@@ -235,6 +399,8 @@ export function ActionSpaceSidebarB() {
   const [insertItems, setInsertItems] = useState<InsertItem[]>([])
   const [insertStep, setInsertStep] = useState(-1)
   const insertItemsRef = useRef<InsertItem[]>([])
+  const chatInputRef = useRef<HTMLTextAreaElement>(null)
+  const [showConfirmation, setShowConfirmation] = useState(true)
 
   const allChecked = definitions.every((d) => checked[d.id])
   const checkedCount = definitions.filter((d) => checked[d.id]).length
@@ -351,6 +517,16 @@ export function ActionSpaceSidebarB() {
     )
   }
 
+  function handleUndoAll() {
+    setInsertItems((prev) =>
+      prev.map((item) =>
+        item.type === 'definition' && item.status === 'inserted'
+          ? { ...item, status: 'undone' }
+          : item
+      )
+    )
+  }
+
   const insertSummary = checkedCount === 0
     ? '1 clause to insert'
     : `1 clause and ${checkedCount} ${checkedCount === 1 ? 'definition' : 'definitions'} to insert`
@@ -358,8 +534,8 @@ export function ActionSpaceSidebarB() {
   const footer = (
     <div className="border-t border-border px-3 py-2.5 flex items-center gap-3">
       <div className="flex-1 flex flex-col gap-1">
-        <p className="text-[14px] font-medium text-foreground leading-[20px]">{insertSummary}</p>
-        <p className="text-[14px] text-muted-foreground leading-[20px]">Edit will be inserted as plain text</p>
+        <p className="text-[16px] font-medium text-foreground leading-[20px]">{insertSummary}</p>
+        <p className="text-[16px] text-muted-foreground leading-[20px]">Edit will be inserted as plain text</p>
       </div>
       <div className="flex items-center shrink-0">
         <Button variant="default" size="default" className="rounded-r-none" onClick={handleInsert}>Insert edit</Button>
@@ -467,12 +643,25 @@ export function ActionSpaceSidebarB() {
         {/* ── Chat mode ── */}
         {mode === 'chat' && (
           <>
-            <div className="flex-1 overflow-y-auto min-h-0 px-3 py-3 flex flex-col gap-3">
+            {/* Working on Edit Space — fixed below Chat header, flush against it */}
+            {agentStep >= 6 && hasVisitedEditSpace && (
+              <div className="shrink-0 px-3 pb-2">
+                <button
+                  onClick={() => setMode('edit')}
+                  className="w-full flex items-center justify-between rounded-b-[14px] border border-input bg-background px-3 py-[9px] hover:bg-accent transition-colors group -mt-px"
+                >
+                  <span className="text-[13px] font-medium text-foreground">Working on the Edit Space</span>
+                  <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0 group-hover:translate-x-0.5 transition-transform" />
+                </button>
+              </div>
+            )}
+
+            <div className="flex-1 overflow-y-auto min-h-0 px-3 py-3 flex flex-col gap-5">
               {chatPhase !== 'idle' && (
                 <>
                   {/* User message */}
                   <div className="flex justify-end">
-                    <div className="w-full rounded-xl rounded-tr-sm bg-[#B8C1DE] text-foreground px-3 py-2 text-[13px] leading-relaxed">
+                    <div className="w-full rounded-xl rounded-tr-sm bg-[#B8C1DE] text-foreground px-3 py-2 text-[16px] leading-relaxed">
                       Pull a limitation of liability clause for a SaaS agreement from Vault
                     </div>
                   </div>
@@ -521,15 +710,54 @@ export function ActionSpaceSidebarB() {
                     </div>
                   )}
 
-                  {/* Insert action cards */}
-                  {insertItems.map((item) => (
-                    <InsertItemCard
-                      key={item.id}
-                      item={item}
-                      onStop={handleStop}
-                      onUndo={handleUndo}
-                    />
-                  ))}
+                  {/* Summary card — clause + definitions introduced */}
+                  {agentStep >= 6 && hasVisitedEditSpace && (
+                    <>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className="shrink-0 h-6 w-6 rounded-full bg-primary" />
+                        <p className="text-[16px] text-foreground">The alternative clause I found from the selected documents</p>
+                      </div>
+                      <div className="w-full rounded-xl border border-border bg-background p-3 flex flex-col gap-2">
+                        <p className="text-[16px] font-medium">Letters of Credit – Authorisation</p>
+                        <div className="h-px bg-border" />
+                        <div>
+                          <p className="text-[14px] text-muted-foreground mb-1.5">Definitions introduced</p>
+                          <div className="flex flex-col gap-0.5">
+                            {definitions.map((d) => (
+                              <p key={d.id} className="text-[16px]">{d.label}</p>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    </>
+                  )}
+
+                  {/* Insert action cards — clause individual, definitions grouped */}
+                  {insertItems.length > 0 && (
+                    <>
+                      {insertItems
+                        .filter((i) => i.type === 'clause')
+                        .map((item) => (
+                          <InsertItemCard
+                            key={item.id}
+                            item={item}
+                            onStop={handleStop}
+                            onUndo={handleUndo}
+                          />
+                        ))}
+                      {insertItems.some((i) => i.type === 'definition') && (
+                        <DefinitionGroupCard
+                          items={insertItems.filter((i) => i.type === 'definition')}
+                          insertPhase={insertPhase}
+                          onStop={handleStop}
+                          onUndo={handleUndo}
+                          onUndoAll={handleUndoAll}
+                        />
+                      )}
+                    </>
+                  )}
                 </>
               )}
             </div>
@@ -538,47 +766,34 @@ export function ActionSpaceSidebarB() {
             <div className="shrink-0 border-t border-border flex flex-col bg-background">
 
               {/* Confirmation card — only during confirming phase, after step 3 */}
-              {chatPhase === 'confirming' && agentStep >= 3 && (
+              {chatPhase === 'confirming' && agentStep >= 3 && showConfirmation && (
                 <div className="px-3 pt-3 pb-2">
                   <div className="rounded border border-border bg-[#d3d9eb] px-3 py-3 flex flex-col gap-3">
-                    <p className="text-[13px] leading-[20px]">
+                    <p className="text-[16px] leading-[20px]">
                       I found the following SaaS agreements in your personal Vault. Would it be okay to use these to find a Limitation of Liability clause?
                     </p>
                     <div className="flex flex-col gap-1.5">
                       {saasAgreements.map((name) => (
                         <button
                           key={name}
-                          className="text-[13px] leading-[18px] text-primary underline underline-offset-2 text-left hover:opacity-80 transition-opacity"
+                          className="text-[16px] leading-[20px] text-primary underline underline-offset-2 text-left hover:opacity-80 transition-opacity"
                         >
                           {name}
                         </button>
                       ))}
                     </div>
                     <div className="flex flex-col items-start gap-2">
-                      <Button variant="default" size="xs" onClick={handleYes}>Yes</Button>
-                      <Button variant="secondary" size="xs" onClick={() => setChatPhase('idle')}>No</Button>
-                      <Button variant="ghost" size="xs" onClick={() => setChatPhase('idle')}>Type something else</Button>
+                      <Button variant="default" size="default" onClick={handleYes}>Yes</Button>
+                      <Button variant="secondary" size="default" onClick={() => setChatPhase('idle')}>No</Button>
+                      <Button variant="ghost" size="default" onClick={() => setTimeout(() => chatInputRef.current?.focus(), 0)}>Type something else</Button>
                     </div>
                   </div>
                 </div>
               )}
 
-              {agentStep >= 6 && hasVisitedEditSpace ? (
-                <div className="mx-2 mt-3 mb-3 flex flex-col">
-                  <button
-                    onClick={() => setMode('edit')}
-                    className="mx-3 flex items-center justify-between rounded-t-[14px] border border-input bg-background px-3 py-[11px] -mb-px relative z-10 hover:bg-accent transition-colors group"
-                  >
-                    <span className="text-[13px] font-medium text-foreground">Working on the Edit Space</span>
-                    <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0 group-hover:translate-x-0.5 transition-transform" />
-                  </button>
-                  <ChatInput onSend={() => setChatPhase('confirming')} placeholder="Ask Enhance" rows={2} />
-                </div>
-              ) : (
-                <div className="px-3 py-3">
-                  <ChatInput onSend={() => setChatPhase('confirming')} placeholder="Ask Enhance" rows={2} />
-                </div>
-              )}
+              <div className="px-3 py-3">
+                <ChatInput onSend={() => { setChatPhase('confirming'); setShowConfirmation(true) }} placeholder="Ask Enhance" rows={2} inputRef={chatInputRef} />
+              </div>
             </div>
           </>
         )}
@@ -609,7 +824,7 @@ export function ActionSpaceSidebarB() {
                     onClick={() => setReasonExpanded((v) => !v)}
                     className="flex items-center gap-3 text-left w-full"
                   >
-                    <p className="flex-1 text-[14px] font-medium leading-[20px] text-muted-foreground">Reason for change</p>
+                    <p className="flex-1 text-[16px] font-medium leading-[20px] text-muted-foreground">Reason for change</p>
                     {reasonExpanded
                       ? <ChevronUp className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                       : <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -624,7 +839,7 @@ export function ActionSpaceSidebarB() {
                       transition={{ duration: 0.2, ease: 'easeInOut' }}
                       style={{ overflow: 'hidden' }}
                     >
-                      <p className="text-[14px] leading-[20px] pt-1">
+                      <p className="text-[16px] leading-[20px] pt-1">
                         These changes would narrow the Borrower's authorisation without materially departing from market-standard LMA risk allocation, while providing protection against defective or fraudulent claims.
                       </p>
                     </motion.div>
@@ -644,13 +859,13 @@ export function ActionSpaceSidebarB() {
                   className="group w-full text-left rounded border border-border bg-[#d3d9eb] px-3 py-2.5 flex items-start gap-3 hover:bg-[#c8d0e8] transition-colors"
                 >
                   <div className="flex-1 flex flex-col gap-1">
-                    <p className="text-[14px] font-medium leading-[20px] text-muted-foreground">{definitions.length} Definitions</p>
-                    <p className="text-[14px] leading-[20px]">
+                    <p className="text-[16px] font-medium leading-[20px] text-muted-foreground">{definitions.length} Definitions</p>
+                    <p className="text-[16px] leading-[20px]">
                       The following definitions resolve terms introduced by this clause. AI-drafted ones are a first draft — review them on the document after inserting.
                     </p>
                   </div>
                   <div className="shrink-0 flex items-center gap-1 mt-0.5 text-muted-foreground">
-                    <span className="text-[13px] font-medium opacity-0 group-hover:opacity-100 transition-opacity">Open</span>
+                    <span className="text-[16px] font-medium opacity-0 group-hover:opacity-100 transition-opacity">Open</span>
                     <ArrowRight className="h-4 w-4" />
                   </div>
                 </button>
@@ -678,8 +893,8 @@ export function ActionSpaceSidebarB() {
                 transition={{ duration: 0.3, ease: 'easeOut', delay: 0.05 }}
               >
                 <div className="flex-1 flex flex-col gap-1">
-                  <p className="text-[14px] font-semibold leading-[20px] text-muted-foreground">Definitions</p>
-                  <p className="text-[14px] text-muted-foreground leading-[20px]">
+                  <p className="text-[16px] font-semibold leading-[20px] text-muted-foreground">Definitions</p>
+                  <p className="text-[16px] text-muted-foreground leading-[20px]">
                     The following definitions resolve terms introduced by this clause. AI-drafted ones are a first draft — review them on the document after inserting.
                   </p>
                 </div>
@@ -708,8 +923,8 @@ export function ActionSpaceSidebarB() {
                         className="mt-1"
                       />
                       <div className="flex flex-col gap-0.5 min-w-0">
-                        <span className="text-[14px] font-medium leading-[20px]">{def.label}</span>
-                        <p className="text-[14px] text-muted-foreground leading-[20px]">{def.description}</p>
+                        <span className="text-[16px] font-medium leading-[20px]">{def.label}</span>
+                        <p className="text-[16px] text-muted-foreground leading-[20px]">{def.description}</p>
                       </div>
                     </div>
                     <div className="col-span-1 flex justify-end pt-0.5">

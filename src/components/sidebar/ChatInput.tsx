@@ -16,13 +16,15 @@ interface ChatInputProps {
   onSend: (text: string) => void
   placeholder?: string
   rows?: number
+  inputRef?: React.RefObject<HTMLTextAreaElement | null>
 }
 
-export function ChatInput({ onSend, placeholder = 'Ask the AI assistant…', rows = 1 }: ChatInputProps) {
+export function ChatInput({ onSend, placeholder = 'Ask the AI assistant…', rows = 1, inputRef }: ChatInputProps) {
   const [value, setValue] = useState('')
   const [popoverOpen, setPopoverOpen] = useState(false)
   const [focused, setFocused] = useState(false)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const internalRef = useRef<HTMLTextAreaElement>(null)
+  const textareaRef = inputRef ?? internalRef
 
   function applyPrompt(prompt: string) {
     setValue(prompt)
