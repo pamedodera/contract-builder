@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
-import { Plus, X, ChevronDown, ChevronRight, ArrowLeft, ArrowRight } from 'lucide-react'
+import { Plus, X, ChevronDown, ChevronRight, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -71,6 +71,7 @@ export function ActionSpaceSidebarB() {
   const [view, setView] = useState<View>('main')
   const [menuOpen, setMenuOpen] = useState(false)
   const [reasonExpanded, setReasonExpanded] = useState(false)
+  const [showRedline, setShowRedline] = useState(true)
   const [checked, setChecked] = useState<Record<string, boolean>>(
     Object.fromEntries(definitions.map((d) => [d.id, true]))
   )
@@ -148,18 +149,30 @@ export function ActionSpaceSidebarB() {
 
       {/* ── Heading bar — changes based on view ── */}
       {view === 'main' ? (
-        <div className="shrink-0 border-b border-border px-3 py-2 flex items-center bg-background">
-          <span className="flex-1 text-sm font-medium text-foreground">Edit Space</span>
-          <Button variant="ghost" size="icon-sm" aria-label="Close">
-            <X className="h-3.5 w-3.5" />
-          </Button>
+        <div className="shrink-0 border-b border-border px-3 pt-2 pb-2.5 flex flex-col gap-1 bg-background">
+          <div className="flex items-center gap-2">
+            <span className="flex-1 text-sm font-medium text-foreground">Edit Space</span>
+            <Button variant="secondary" size="xs" onClick={() => setShowRedline((v) => !v)}>
+              {showRedline ? 'Hide redline' : 'Show redline'}
+            </Button>
+            <Button variant="ghost" size="icon-sm" aria-label="Close">
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+          <p className="text-[13px] text-muted-foreground leading-[18px]">
+            Pull a limitation of liability clause for a SaaS agreement from Vault and drop it into my working document.
+          </p>
         </div>
       ) : (
-        <div className="shrink-0 border-b border-border px-2 py-2 flex items-center gap-1 bg-background">
-          <Button variant="ghost" size="icon-sm" aria-label="Back" onClick={() => setView('main')}>
-            <ArrowLeft className="h-3.5 w-3.5" />
-          </Button>
-          <span className="flex-1 text-sm font-medium text-foreground">Definitions</span>
+        <div className="shrink-0 border-b border-border px-3 py-2 flex items-center gap-1 bg-background">
+          <button
+            onClick={() => setView('main')}
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Edit Space
+          </button>
+          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          <span className="text-sm font-medium text-foreground">Definitions</span>
         </div>
       )}
 
@@ -169,34 +182,15 @@ export function ActionSpaceSidebarB() {
           {/* Clause body — fills available space, scrolls internally */}
           <div className="flex-1 overflow-hidden flex flex-col min-h-0">
             <div className="flex-1 overflow-y-auto min-h-0">
-              <ClauseCardFlat />
+              <ClauseCardFlat showRedline={showRedline} />
             </div>
           </div>
 
           {/* Sticky bottom */}
           <div className="shrink-0 border-t border-border flex flex-col">
 
-            {/* Definitions collapsed card */}
-            <div className="px-3 pt-3 pb-2">
-              <button
-                onClick={() => setView('definitions')}
-                className="group w-full text-left rounded border border-border bg-[#d3d9eb] px-3 py-2.5 flex items-start gap-3 hover:bg-[#c8d0e8] transition-colors"
-              >
-                <div className="flex-1 flex flex-col gap-1">
-                  <p className="text-[14px] font-medium leading-[20px] text-muted-foreground">Definitions</p>
-                  <p className="text-[14px] leading-[20px]">
-                    The following definitions resolve terms introduced by this clause. AI-drafted ones are a first draft — review them on the document after inserting.
-                  </p>
-                </div>
-                <div className="shrink-0 flex items-center gap-1 mt-0.5 text-muted-foreground">
-                  <span className="text-[13px] font-medium opacity-0 group-hover:opacity-100 transition-opacity">Open</span>
-                  <ArrowRight className="h-4 w-4" />
-                </div>
-              </button>
-            </div>
-
             {/* Reason for change (collapsible) */}
-            <div className="px-3 pt-1 pb-3">
+            <div className="px-3 pt-3 pb-2">
               <div className="rounded border border-border bg-[#d3d9eb] px-3 py-2.5 flex flex-col gap-1">
                 <button
                   onClick={() => setReasonExpanded((v) => !v)}
@@ -214,6 +208,25 @@ export function ActionSpaceSidebarB() {
                   </p>
                 )}
               </div>
+            </div>
+
+            {/* Definitions collapsed card */}
+            <div className="px-3 pt-1 pb-3">
+              <button
+                onClick={() => setView('definitions')}
+                className="group w-full text-left rounded border border-border bg-[#d3d9eb] px-3 py-2.5 flex items-start gap-3 hover:bg-[#c8d0e8] transition-colors"
+              >
+                <div className="flex-1 flex flex-col gap-1">
+                  <p className="text-[14px] font-medium leading-[20px] text-muted-foreground">Definitions</p>
+                  <p className="text-[14px] leading-[20px]">
+                    The following definitions resolve terms introduced by this clause. AI-drafted ones are a first draft — review them on the document after inserting.
+                  </p>
+                </div>
+                <div className="shrink-0 flex items-center gap-1 mt-0.5 text-muted-foreground">
+                  <span className="text-[13px] font-medium opacity-0 group-hover:opacity-100 transition-opacity">Open</span>
+                  <ArrowRight className="h-4 w-4" />
+                </div>
+              </button>
             </div>
 
             {footer}

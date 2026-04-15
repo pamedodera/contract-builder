@@ -1,4 +1,4 @@
-export function ClauseCardFlat() {
+export function ClauseCardFlat({ showRedline = true }: { showRedline?: boolean }) {
   return (
     <div className="text-foreground text-[16px] leading-[26px] flex flex-col gap-4 px-3 py-3">
 
@@ -19,11 +19,13 @@ export function ClauseCardFlat() {
           <span>
             {'(a) Each Borrower irrevocably and unconditionally authorises the Issuing Bank to pay any claim made or purported to be made under a Letter of Credit requested by it (or requested by the Parent on its behalf) '}
           </span>
-          <span className="line-through text-[#f9221a]">
-            and which appears on its face to be in order
-          </span>
-          <span>{' '}</span>
-          <span className="underline text-[#267d7d]">
+          {showRedline && (
+            <span className="line-through text-[#f9221a]">
+              and which appears on its face to be in order
+            </span>
+          )}
+          {showRedline && <span>{' '}</span>}
+          <span className={showRedline ? 'underline text-[#267d7d]' : ''}>
             provided that such claim strictly complies with the terms and conditions of the relevant Letter of Credit and the Issuing Bank is not aware of manifest fraud in relation to such claim
           </span>
           <span>{" (in this Clause\u200f\u00a07, a \u2018claim\u2019)."}</span>
