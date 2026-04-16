@@ -74,6 +74,15 @@ const definitionLocations: Record<string, string> = {
   'force-majeure': "Definitions · after 'Finance Documents'",
 }
 
+const defaultPrompts = [
+  { id: 'p1', label: 'Pull limitation of liability clause', prompt: 'Pull a limitation of liability clause for a SaaS agreement from Vault' },
+  { id: 'p2', label: 'Identify risks', prompt: 'What are the key risks in this clause for my client?' },
+  { id: 'p3', label: 'Suggest alternatives', prompt: 'Suggest three alternative formulations for this clause.' },
+  { id: 'p6', label: 'Find any Unused Terms', prompt: 'Identify any defined terms in the draft that are not actually used in any clause.' },
+  { id: 'p7', label: 'Find Undefined Terms', prompt: 'Identify any terms used in the draft that have not been defined.' },
+  { id: 'p8', label: 'Find cascading issues', prompt: 'Identify any clauses that may create cascading obligations or conflicts with other clauses in the draft.' },
+]
+
 const saasAgreements = [
   'Salesforce Order Form – MSA 2023',
   'HubSpot Enterprise SaaS Agreement 2022',
@@ -413,6 +422,8 @@ export function ActionSpaceSidebarB() {
   const pendingFileRef = useRef<string>('')
   const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[]>([])
   const [uploadingFile, setUploadingFile] = useState('')
+  const [promptOpen, setPromptOpen] = useState(false)
+  const [appliedPrompt, setAppliedPrompt] = useState<{ text: string; v: number } | null>(null)
 
   const allChecked = definitions.every((d) => checked[d.id])
   const checkedCount = definitions.filter((d) => checked[d.id]).length
@@ -799,6 +810,44 @@ export function ActionSpaceSidebarB() {
         {mode === 'chat' ? (
           <div className="shrink-0 border-b border-border px-3 py-2 flex items-center bg-background">
             <span className="flex-1 text-sm font-medium text-foreground">Chat</span>
+            <Popover open={promptOpen} onOpenChange={setPromptOpen}>
+              <PopoverTrigger
+                className={buttonVariants({ variant: 'outline', size: 'icon-sm' })}
+                aria-label="Saved Prompts"
+              >
+                <Bookmark className="h-3.5 w-3.5" />
+              </PopoverTrigger>
+              <PopoverContent side="bottom" align="end" className="w-64 p-1">
+                <p className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Saved Prompts</p>
+                {savedPrompts.length > 0 && (
+                  <>
+                    <div className="space-y-0.5">
+                      {savedPrompts.map((item) => (
+                        <button
+                          key={item.id}
+                          onClick={() => { setAppliedPrompt({ text: item.prompt, v: Date.now() }); setPromptOpen(false) }}
+                          className="w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="my-1 h-px bg-border" />
+                  </>
+                )}
+                <div className="space-y-0.5">
+                  {defaultPrompts.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => { setAppliedPrompt({ text: item.prompt, v: Date.now() }); setPromptOpen(false) }}
+                      className="w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
         ) : view === 'main' ? (
           <div className="shrink-0 border-b border-border px-3 py-2 flex items-center gap-2 bg-background">
@@ -983,7 +1032,7 @@ export function ActionSpaceSidebarB() {
               )}
 
               <div className="px-3 py-3">
-                <ChatInput onSend={() => { setChatPhase('confirming'); setShowConfirmation(true) }} placeholder="Ask Enhance" rows={2} inputRef={chatInputRef} attachedFiles={uploadedFiles} onRemoveFile={(i) => setUploadedFiles((prev) => prev.filter((_, idx) => idx !== i))} savedPrompts={savedPrompts} uploadingFile={uploadingFile} isDragActive={dragState === 'dragging'} />
+                <ChatInput onSend={() => { setChatPhase('confirming'); setShowConfirmation(true) }} placeholder="Ask Enhance" rows={2} inputRef={chatInputRef} attachedFiles={uploadedFiles} onRemoveFile={(i) => setUploadedFiles((prev) => prev.filter((_, idx) => idx !== i))} promptToApply={appliedPrompt} uploadingFile={uploadingFile} isDragActive={dragState === 'dragging'} />
               </div>
             </div>
           </div>

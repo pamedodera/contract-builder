@@ -1,18 +1,9 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
-import { Paperclip, BookOpen, ArrowUp, FileText, X, Loader2 } from 'lucide-react'
+import { Paperclip, ArrowUp, FileText, X, Loader2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
-
-const defaultPrompts = [
-  { id: 'p1', label: 'Pull limitation of liability clause', prompt: 'Pull a limitation of liability clause for a SaaS agreement from Vault' },
-  { id: 'p2', label: 'Identify risks', prompt: 'What are the key risks in this clause for my client?' },
-  { id: 'p3', label: 'Suggest alternatives', prompt: 'Suggest three alternative formulations for this clause.' },
-  { id: 'p6', label: 'Find any Unused Terms', prompt: 'Identify any defined terms in the draft that are not actually used in any clause.' },
-  { id: 'p7', label: 'Find Undefined Terms', prompt: 'Identify any terms used in the draft that have not been defined.' },
-  { id: 'p8', label: 'Find cascading issues', prompt: 'Identify any clauses that may create cascading obligations or conflicts with other clauses in the draft.' },
-]
 
 export type SavedPrompt = { id: string; label: string; prompt: string }
 
@@ -77,14 +68,13 @@ interface ChatInputProps {
   inputRef?: React.RefObject<HTMLTextAreaElement | null>
   attachedFiles?: string[]
   onRemoveFile?: (index: number) => void
-  savedPrompts?: SavedPrompt[]
+  promptToApply?: { text: string; v: number } | null
   uploadingFile?: string
   isDragActive?: boolean
 }
 
-export function ChatInput({ onSend, placeholder = 'Ask the AI assistant…', rows = 1, inputRef, attachedFiles = [], onRemoveFile, savedPrompts = [], uploadingFile, isDragActive }: ChatInputProps) {
+export function ChatInput({ onSend, placeholder = 'Ask the AI assistant…', rows = 1, inputRef, attachedFiles = [], onRemoveFile, promptToApply, uploadingFile, isDragActive }: ChatInputProps) {
   const [value, setValue] = useState('')
-  const [promptOpen, setPromptOpen] = useState(false)
   const [overflowOpen, setOverflowOpen] = useState(false)
   const [focused, setFocused] = useState(false)
   const [highlighted, setHighlighted] = useState(false)
@@ -99,6 +89,14 @@ export function ChatInput({ onSend, placeholder = 'Ask the AI assistant…', row
   useEffect(() => {
     if (attachedFiles.length > 0) textareaRef.current?.focus()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Apply a prompt selected from the header popover
+  useEffect(() => {
+    if (promptToApply) {
+      setValue(promptToApply.text)
+      textareaRef.current?.focus()
+    }
+  }, [promptToApply]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Pulse a highlight ring when a new file is added
   useEffect(() => {
@@ -265,45 +263,6 @@ export function ChatInput({ onSend, placeholder = 'Ask the AI assistant…', row
         <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" disabled aria-label="Attach documents">
           <Paperclip className="h-3.5 w-3.5" />
         </Button>
-
-        <Popover open={promptOpen} onOpenChange={setPromptOpen}>
-          <PopoverTrigger
-            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-            aria-label="Saved Prompts"
-          >
-            <BookOpen className="h-3.5 w-3.5" />
-          </PopoverTrigger>
-          <PopoverContent side="top" align="end" className="w-64 p-1">
-            <p className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Saved Prompts</p>
-            {savedPrompts.length > 0 && (
-              <>
-                <div className="space-y-0.5">
-                  {savedPrompts.map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => applyPrompt(item.prompt)}
-                      className="w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-                <div className="my-1 h-px bg-border" />
-              </>
-            )}
-            <div className="space-y-0.5">
-              {defaultPrompts.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => applyPrompt(item.prompt)}
-                  className="w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          </PopoverContent>
-        </Popover>
 
         <Button
           size="icon"
