@@ -1,13 +1,13 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
+@import "@fontsource-variable/inter";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
     --font-heading: var(--font-sans);
-    --font-sans: 'Geist Variable', sans-serif;
+    --font-sans: 'Inter Variable', sans-serif;
 
     /* Shift scale so text-sm = 16px (body baseline), text-xs = 14px */
     --text-xs: 0.875rem;    /* 14px — badges, labels */
@@ -123,6 +123,36 @@
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.556 0 0);
+}
+
+.action-space-theme {
+  color-scheme: light;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.115 0.065 264);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.115 0.065 264);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.115 0.065 264);
+  --primary: #061131;
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(1 0 0);
+  --secondary-foreground: oklch(0.115 0.065 264);
+  --muted: oklch(0.955 0.012 258);
+  --muted-foreground: oklch(0.40 0.03 258);
+  --accent: oklch(0.93 0.013 258);
+  --accent-foreground: oklch(0.115 0.065 264);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.905 0.013 258);
+  --input: oklch(0.905 0.013 258);
+  --ring: #061131;
+  --sidebar: oklch(0.955 0.012 258);
+  --sidebar-foreground: oklch(0.115 0.065 264);
+  --sidebar-primary: #061131;
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.93 0.013 258);
+  --sidebar-accent-foreground: oklch(0.115 0.065 264);
+  --sidebar-border: oklch(0.905 0.013 258);
+  --sidebar-ring: #061131;
 }
 
 .brand-theme {
