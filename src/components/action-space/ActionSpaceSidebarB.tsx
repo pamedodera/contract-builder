@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { cn } from '@/lib/utils'
-import { Plus, ChevronDown, ChevronUp, ChevronRight, ArrowRight, Check, Loader2, Undo2 } from 'lucide-react'
+import { Plus, ChevronDown, ChevronUp, ChevronRight, ArrowRight, Check, Loader2, Undo2, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -642,21 +642,22 @@ export function ActionSpaceSidebarB() {
 
         {/* ── Chat mode ── */}
         {mode === 'chat' && (
-          <>
-            {/* Working on Edit Space — fixed below Chat header, flush against it */}
-            {agentStep >= 6 && hasVisitedEditSpace && (
-              <div className="shrink-0 px-3 pb-2">
-                <button
-                  onClick={() => setMode('edit')}
-                  className="w-full flex items-center justify-between rounded-b-[14px] border border-input bg-background px-3 py-[9px] hover:bg-accent transition-colors group -mt-px"
-                >
-                  <span className="text-sm font-medium text-foreground">Working on the Edit Space</span>
-                  <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0 group-hover:translate-x-0.5 transition-transform" />
-                </button>
-              </div>
-            )}
+          <div className="flex-1 flex flex-col min-h-0">
+            <div className="flex-1 overflow-y-auto min-h-0">
+              {/* Working on Edit Space — sticky at top of scroll area, content scrolls under */}
+              {agentStep >= 6 && hasVisitedEditSpace && (
+                <div className="sticky top-0 z-10 px-3 pb-2">
+                  <button
+                    onClick={() => setMode('edit')}
+                    className="w-full flex items-center justify-between rounded-b-[14px] border border-input bg-background px-3 py-[9px] hover:bg-accent transition-colors group -mt-px shadow-md"
+                  >
+                    <span className="text-sm font-medium text-foreground">Working on the Edit Space</span>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0 group-hover:translate-x-0.5 transition-transform" />
+                  </button>
+                </div>
+              )}
 
-            <div className="flex-1 overflow-y-auto min-h-0 px-3 py-3 flex flex-col gap-5">
+              <div className="px-3 py-3 flex flex-col gap-5">
               {chatPhase !== 'idle' && (
                 <>
                   {/* User message */}
@@ -710,28 +711,12 @@ export function ActionSpaceSidebarB() {
                     </div>
                   )}
 
-                  {/* Summary card — clause + definitions introduced */}
+                  {/* Summary card — found clause */}
                   {agentStep >= 6 && hasVisitedEditSpace && (
-                    <>
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-center gap-2 py-1">
-                        <div className="shrink-0 h-6 w-6 rounded-full bg-[#DEE3F0]" />
-                        <p className="text-[16px] text-foreground">The alternative clause I found from the selected documents</p>
-                      </div>
-                      <div className="w-full rounded-xl border border-border bg-background p-3 flex flex-col gap-2">
-                        <p className="text-[16px] font-medium">Letters of Credit – Authorisation</p>
-                        <div className="h-px bg-border" />
-                        <div>
-                          <p className="text-[14px] text-muted-foreground mb-1.5">Definitions introduced</p>
-                          <div className="flex flex-col gap-0.5">
-                            {definitions.map((d) => (
-                              <p key={d.id} className="text-[16px]">{d.label}</p>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
+                    <div className="w-full rounded-xl border border-border bg-background p-3 flex items-start gap-3">
+                      <FileText className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span className="text-[16px] font-medium">Found Letters of Credit – Authorisation</span>
                     </div>
-                    </>
                   )}
 
                   {/* Insert action cards — clause individual, definitions grouped */}
@@ -760,6 +745,7 @@ export function ActionSpaceSidebarB() {
                   )}
                 </>
               )}
+              </div>
             </div>
 
             {/* Sticky bottom */}
@@ -795,7 +781,7 @@ export function ActionSpaceSidebarB() {
                 <ChatInput onSend={() => { setChatPhase('confirming'); setShowConfirmation(true) }} placeholder="Ask Enhance" rows={2} inputRef={chatInputRef} />
               </div>
             </div>
-          </>
+          </div>
         )}
 
         {/* ── Enhance: main view ── */}
