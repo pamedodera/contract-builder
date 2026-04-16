@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { cn } from '@/lib/utils'
-import { Plus, ChevronDown, ChevronUp, ChevronRight, ArrowRight, Check, Loader2, Undo2, FileText } from 'lucide-react'
+import { Plus, ChevronDown, ChevronUp, ChevronRight, ArrowRight, Check, Loader2, Undo2, FileText, Upload, FileUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -15,6 +15,7 @@ type Mode = 'edit' | 'chat'
 type ChatPhase = 'idle' | 'confirming' | 'processing'
 type StepStatus = 'loading' | 'done' | 'waiting'
 type InsertStatus = 'pending' | 'inserting' | 'inserted' | 'undone' | 'cancelled'
+type DragState = 'idle' | 'dragging' | 'uploading'
 type InsertPhase = 'idle' | 'running' | 'stopped' | 'done'
 type InsertItem = {
   id: string
@@ -401,6 +402,9 @@ export function ActionSpaceSidebarB() {
   const insertItemsRef = useRef<InsertItem[]>([])
   const chatInputRef = useRef<HTMLTextAreaElement>(null)
   const [showConfirmation, setShowConfirmation] = useState(true)
+  const [dragState, setDragState] = useState<DragState>('idle')
+  const [uploadedFiles, setUploadedFiles] = useState<string[]>([])
+  const dragCounterRef = useRef<number>(0)
 
   const allChecked = definitions.every((d) => checked[d.id])
   const checkedCount = definitions.filter((d) => checked[d.id]).length
@@ -527,6 +531,47 @@ export function ActionSpaceSidebarB() {
     )
   }
 
+  // Transition to chat after upload completes, then focus the input
+  useEffect(() => {
+    if (dragState !== 'uploading') return
+    const t = setTimeout(() => {
+      setMode('chat')
+      setView('main')
+      setDragState('idle')
+      setTimeout(() => chatInputRef.current?.focus(), 50)
+    }, 2400)
+    return () => clearTimeout(t)
+  }, [dragState])
+
+  // Reset counter whenever drag state returns to idle
+  useEffect(() => {
+    if (dragState === 'idle') dragCounterRef.current = 0
+  }, [dragState])
+
+  function handleDragEnter(e: React.DragEvent) {
+    e.preventDefault()
+    dragCounterRef.current += 1
+    if (dragState === 'idle') setDragState('dragging')
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault()
+    dragCounterRef.current -= 1
+    if (dragCounterRef.current === 0) setDragState('idle')
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault()
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault()
+    dragCounterRef.current = 0
+    const file = e.dataTransfer.files[0]
+    setUploadedFiles((prev) => [...prev, file?.name ?? 'document'])
+    setDragState('uploading')
+  }
+
   const insertSummary = checkedCount === 0
     ? '1 clause to insert'
     : `1 clause and ${checkedCount} ${checkedCount === 1 ? 'definition' : 'definitions'} to insert`
@@ -612,7 +657,66 @@ export function ActionSpaceSidebarB() {
       </div>
 
       {/* ── Everything below the tab bar fades during transition ── */}
-      <div className={cn('flex-1 flex flex-col min-h-0 transition-opacity duration-500', isTransitioning && 'opacity-0')}>
+      <div
+        className={cn('relative flex-1 flex flex-col min-h-0 transition-opacity duration-500', isTransitioning && 'opacity-0')}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+      >
+
+        {/* ── Drag-and-drop overlay ── */}
+        <AnimatePresence>
+          {dragState !== 'idle' && (
+            <motion.div
+              key="drag-overlay"
+              className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-sidebar/90 backdrop-blur-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <AnimatePresence mode="wait">
+                {dragState === 'dragging' && (
+                  <motion.div
+                    key="drop-zone"
+                    initial={{ opacity: 0, scale: 0.97 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.97 }}
+                    transition={{ duration: 0.15 }}
+                    className="mx-6 w-full max-w-[260px] rounded-xl border-2 border-dashed border-primary/40 bg-background/60 px-6 py-10 flex flex-col items-center gap-3 text-center pointer-events-none"
+                  >
+                    <Upload className="h-8 w-8 text-primary/60" />
+                    <p className="text-sm font-medium text-foreground">Drop document here</p>
+                  </motion.div>
+                )}
+                {dragState === 'uploading' && (
+                  <motion.div
+                    key="uploading"
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="mx-6 w-full max-w-[260px] flex flex-col gap-3 pointer-events-none"
+                  >
+                    <div className="flex items-center gap-2">
+                      <FileUp className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <p className="text-sm font-medium text-foreground truncate">Adding your document...</p>
+                    </div>
+                    <div className="h-1.5 w-full rounded-full bg-border overflow-hidden">
+                      <motion.div
+                        className="h-full rounded-full bg-primary"
+                        initial={{ width: '0%' }}
+                        animate={{ width: '100%' }}
+                        transition={{ duration: 2, ease: 'easeInOut' }}
+                      />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* ── Heading bar ── */}
         {mode === 'chat' ? (
@@ -778,7 +882,7 @@ export function ActionSpaceSidebarB() {
               )}
 
               <div className="px-3 py-3">
-                <ChatInput onSend={() => { setChatPhase('confirming'); setShowConfirmation(true) }} placeholder="Ask Enhance" rows={2} inputRef={chatInputRef} />
+                <ChatInput onSend={() => { setChatPhase('confirming'); setShowConfirmation(true) }} placeholder="Ask Enhance" rows={2} inputRef={chatInputRef} attachedFiles={uploadedFiles} onRemoveFile={(i) => setUploadedFiles((prev) => prev.filter((_, idx) => idx !== i))} />
               </div>
             </div>
           </div>
