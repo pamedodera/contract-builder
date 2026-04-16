@@ -74,13 +74,10 @@ const definitionLocations: Record<string, string> = {
   'force-majeure': "Definitions · after 'Finance Documents'",
 }
 
-const defaultPrompts = [
-  { id: 'p1', label: 'Pull limitation of liability clause', prompt: 'Pull a limitation of liability clause for a SaaS agreement from Vault' },
-  { id: 'p2', label: 'Identify risks', prompt: 'What are the key risks in this clause for my client?' },
-  { id: 'p3', label: 'Suggest alternatives', prompt: 'Suggest three alternative formulations for this clause.' },
-  { id: 'p6', label: 'Find any Unused Terms', prompt: 'Identify any defined terms in the draft that are not actually used in any clause.' },
-  { id: 'p7', label: 'Find Undefined Terms', prompt: 'Identify any terms used in the draft that have not been defined.' },
-  { id: 'p8', label: 'Find cascading issues', prompt: 'Identify any clauses that may create cascading obligations or conflicts with other clauses in the draft.' },
+const predefinedActions = [
+  { id: 'analyse', label: 'Analyse this document against Vault precedents', prompt: 'Analyse this document against Vault precedents' },
+  { id: 'insert', label: 'Insert a clause with its associated undefined terms', prompt: 'Insert a clause with its associated undefined terms' },
+  { id: 'compare', label: 'Compare document against standard position', prompt: 'Compare document against standard position' },
 ]
 
 const saasAgreements = [
@@ -424,6 +421,7 @@ export function ActionSpaceSidebarB() {
   const [uploadingFile, setUploadingFile] = useState('')
   const [promptOpen, setPromptOpen] = useState(false)
   const [appliedPrompt, setAppliedPrompt] = useState<{ text: string; v: number } | null>(null)
+  const [selectedActionLabel, setSelectedActionLabel] = useState<string | null>(null)
 
   const allChecked = definitions.every((d) => checked[d.id])
   const checkedCount = definitions.filter((d) => checked[d.id]).length
@@ -602,6 +600,14 @@ export function ActionSpaceSidebarB() {
     if (savedPrompts.some((p) => p.prompt === text)) return
     const label = text.length > 42 ? text.slice(0, 40) + '…' : text
     setSavedPrompts((prev) => [{ id: `saved-${Date.now()}`, label, prompt: text }, ...prev])
+  }
+
+  function handleActionClick(actionId: string, label: string) {
+    setSelectedActionLabel(label)
+    if (actionId === 'analyse') {
+      setChatPhase('confirming')
+      setShowConfirmation(true)
+    }
   }
 
   // Transition to chat after upload completes, then focus the input
@@ -836,7 +842,7 @@ export function ActionSpaceSidebarB() {
                   </>
                 )}
                 <div className="space-y-0.5">
-                  {defaultPrompts.map((item) => (
+                  {predefinedActions.map((item) => (
                     <button
                       key={item.id}
                       onClick={() => { setAppliedPrompt({ text: item.prompt, v: Date.now() }); setPromptOpen(false) }}
@@ -888,21 +894,38 @@ export function ActionSpaceSidebarB() {
               )}
 
               <div className="px-3 py-3 flex flex-col gap-5">
-              {chatPhase !== 'idle' && (
+              {/* Empty state — pre-defined action cards */}
+              {chatPhase === 'idle' && selectedActionLabel === null && (
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs font-medium text-muted-foreground">Pre-defined Actions</p>
+                  {predefinedActions.map((action) => (
+                    <button
+                      key={action.id}
+                      onClick={() => handleActionClick(action.id, action.label)}
+                      className="w-full text-left rounded-xl border border-border bg-background px-3 py-3 hover:bg-accent transition-colors flex items-center gap-2 group"
+                    >
+                      <span className="flex-1 text-[16px] leading-[20px] text-foreground">{action.label}</span>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {selectedActionLabel !== null && (
                 <>
                   {/* User message */}
                   {(() => {
-                    const msg = 'Pull a limitation of liability clause for a SaaS agreement from Vault'
-                    const isSaved = savedPrompts.some((p) => p.prompt === msg)
+                    const label = selectedActionLabel as string
+                    const isSaved = savedPrompts.some((p) => p.prompt === label)
                     return (
                       <div className="flex justify-end group/msg">
                         <div className="flex flex-col items-end gap-1 w-full">
                           <div className="w-full rounded-xl rounded-tr-sm bg-[#B8C1DE] text-foreground px-3 py-2 text-[16px] leading-relaxed">
-                            {msg}
+                            {label}
                           </div>
                           <button
                             type="button"
-                            onClick={() => handleSavePrompt(msg)}
+                            onClick={() => handleSavePrompt(label)}
                             className="opacity-0 group-hover/msg:opacity-100 transition-opacity flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                             aria-label="Save as prompt"
                           >
