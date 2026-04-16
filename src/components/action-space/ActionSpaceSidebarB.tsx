@@ -1,12 +1,12 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Fragment } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { cn } from '@/lib/utils'
-import { Plus, ChevronDown, ChevronUp, ChevronRight, ArrowRight, Check, Loader2, Undo2, FileText, Upload, FileUp } from 'lucide-react'
+import { Plus, ChevronDown, ChevronUp, ChevronRight, ArrowRight, Check, Loader2, Undo2, FileText, Upload, FileUp, BookmarkPlus, Bookmark } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { ChatInput } from '@/components/sidebar/ChatInput'
+import { ChatInput, type SavedPrompt } from '@/components/sidebar/ChatInput'
 import { ClauseCardFlat } from './ClauseCardFlat'
 
 type Tab = 'vault' | 'draft' | 'proof' | 'cascade' | 'enhance'
@@ -23,6 +23,11 @@ type InsertItem = {
   label: string
   location: string
   status: InsertStatus
+}
+
+type InsertBatch = {
+  id: string
+  items: InsertItem[]
 }
 
 const tabs: { id: Tab; label: string }[] = [
@@ -397,15 +402,16 @@ export function ActionSpaceSidebarB() {
     Object.fromEntries(definitions.map((d) => [d.id, true]))
   )
   const [insertPhase, setInsertPhase] = useState<InsertPhase>('idle')
-  const [insertItems, setInsertItems] = useState<InsertItem[]>([])
+  const [insertBatches, setInsertBatches] = useState<InsertBatch[]>([])
   const [insertStep, setInsertStep] = useState(-1)
-  const insertItemsRef = useRef<InsertItem[]>([])
+  const insertBatchRef = useRef<InsertBatch | null>(null)
   const chatInputRef = useRef<HTMLTextAreaElement>(null)
   const [showConfirmation, setShowConfirmation] = useState(true)
   const [dragState, setDragState] = useState<DragState>('idle')
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([])
   const dragCounterRef = useRef<number>(0)
   const pendingFileRef = useRef<string>('')
+  const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[]>([])
 
   const allChecked = definitions.every((d) => checked[d.id])
   const checkedCount = definitions.filter((d) => checked[d.id]).length
@@ -448,17 +454,26 @@ export function ActionSpaceSidebarB() {
   // Drive insert item sequence one step at a time
   useEffect(() => {
     if (insertPhase !== 'running' || insertStep < 0) return
-    const items = insertItemsRef.current
-    if (insertStep >= items.length) {
+    const batch = insertBatchRef.current
+    if (!batch) return
+    if (insertStep >= batch.items.length) {
       setInsertPhase('done')
       return
     }
-    setInsertItems((prev) =>
-      prev.map((item, i) => (i === insertStep ? { ...item, status: 'inserting' } : item))
+    setInsertBatches((prev) =>
+      prev.map((b) =>
+        b.id === batch.id
+          ? { ...b, items: b.items.map((item, i) => (i === insertStep ? { ...item, status: 'inserting' } : item)) }
+          : b
+      )
     )
     const t = setTimeout(() => {
-      setInsertItems((prev) =>
-        prev.map((item, i) => (i === insertStep ? { ...item, status: 'inserted' } : item))
+      setInsertBatches((prev) =>
+        prev.map((b) =>
+          b.id === batch.id
+            ? { ...b, items: b.items.map((item, i) => (i === insertStep ? { ...item, status: 'inserted' } : item)) }
+            : b
+        )
       )
       setInsertStep((s) => s + 1)
     }, 1200)
@@ -479,9 +494,10 @@ export function ActionSpaceSidebarB() {
   }
 
   function handleInsert() {
+    const batchId = `batch-${Date.now()}`
     const items: InsertItem[] = [
       {
-        id: 'clause',
+        id: `${batchId}-clause`,
         type: 'clause',
         label: 'Letters of Credit – Authorisation',
         location: 'after clause 7.1(a)',
@@ -490,15 +506,34 @@ export function ActionSpaceSidebarB() {
       ...definitions
         .filter((d) => checked[d.id])
         .map((d) => ({
-          id: d.id,
+          id: `${batchId}-${d.id}`,
           type: 'definition' as const,
           label: d.label,
           location: definitionLocations[d.id] ?? 'Definitions section',
           status: 'pending' as InsertStatus,
         })),
     ]
-    insertItemsRef.current = items
-    setInsertItems(items)
+    // Cancel any in-progress items from the previous batch
+    const prevBatch = insertBatchRef.current
+    if (prevBatch && (insertPhase === 'running' || insertPhase === 'stopped')) {
+      setInsertBatches((prev) =>
+        prev.map((b) =>
+          b.id === prevBatch.id
+            ? {
+                ...b,
+                items: b.items.map((item) =>
+                  item.status === 'pending' || item.status === 'inserting'
+                    ? { ...item, status: 'cancelled' }
+                    : item
+                ),
+              }
+            : b
+        )
+      )
+    }
+    const newBatch: InsertBatch = { id: batchId, items }
+    insertBatchRef.current = newBatch
+    setInsertBatches((prev) => [...prev, newBatch])
     setInsertStep(0)
     setInsertPhase('running')
     setMode('chat')
@@ -507,29 +542,54 @@ export function ActionSpaceSidebarB() {
 
   function handleStop() {
     setInsertPhase('stopped')
-    setInsertItems((prev) =>
-      prev.map((item) =>
-        item.status === 'pending' || item.status === 'inserting'
-          ? { ...item, status: 'cancelled' }
-          : item
+    const batch = insertBatchRef.current
+    if (!batch) return
+    setInsertBatches((prev) =>
+      prev.map((b) =>
+        b.id === batch.id
+          ? {
+              ...b,
+              items: b.items.map((item) =>
+                item.status === 'pending' || item.status === 'inserting'
+                  ? { ...item, status: 'cancelled' }
+                  : item
+              ),
+            }
+          : b
       )
     )
   }
 
   function handleUndo(id: string) {
-    setInsertItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, status: 'undone' } : item))
+    setInsertBatches((prev) =>
+      prev.map((b) => ({
+        ...b,
+        items: b.items.map((item) => (item.id === id ? { ...item, status: 'undone' } : item)),
+      }))
     )
   }
 
-  function handleUndoAll() {
-    setInsertItems((prev) =>
-      prev.map((item) =>
-        item.type === 'definition' && item.status === 'inserted'
-          ? { ...item, status: 'undone' }
-          : item
+  function handleUndoAll(batchId: string) {
+    setInsertBatches((prev) =>
+      prev.map((b) =>
+        b.id === batchId
+          ? {
+              ...b,
+              items: b.items.map((item) =>
+                item.type === 'definition' && item.status === 'inserted'
+                  ? { ...item, status: 'undone' }
+                  : item
+              ),
+            }
+          : b
       )
     )
+  }
+
+  function handleSavePrompt(text: string) {
+    if (savedPrompts.some((p) => p.prompt === text)) return
+    const label = text.length > 42 ? text.slice(0, 40) + '…' : text
+    setSavedPrompts((prev) => [{ id: `saved-${Date.now()}`, label, prompt: text }, ...prev])
   }
 
   // Transition to chat after upload completes, then focus the input
@@ -771,11 +831,31 @@ export function ActionSpaceSidebarB() {
               {chatPhase !== 'idle' && (
                 <>
                   {/* User message */}
-                  <div className="flex justify-end">
-                    <div className="w-full rounded-xl rounded-tr-sm bg-[#B8C1DE] text-foreground px-3 py-2 text-[16px] leading-relaxed">
-                      Pull a limitation of liability clause for a SaaS agreement from Vault
-                    </div>
-                  </div>
+                  {(() => {
+                    const msg = 'Pull a limitation of liability clause for a SaaS agreement from Vault'
+                    const isSaved = savedPrompts.some((p) => p.prompt === msg)
+                    return (
+                      <div className="flex justify-end group/msg">
+                        <div className="flex flex-col items-end gap-1 w-full">
+                          <div className="w-full rounded-xl rounded-tr-sm bg-[#B8C1DE] text-foreground px-3 py-2 text-[16px] leading-relaxed">
+                            {msg}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleSavePrompt(msg)}
+                            className="opacity-0 group-hover/msg:opacity-100 transition-opacity flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                            aria-label="Save as prompt"
+                          >
+                            {isSaved
+                              ? <Bookmark className="h-3 w-3 fill-current" />
+                              : <BookmarkPlus className="h-3 w-3" />
+                            }
+                            {isSaved ? 'Saved' : 'Save'}
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })()}
 
                   {/* Agent timeline card */}
                   {agentStep >= 1 && (
@@ -829,12 +909,15 @@ export function ActionSpaceSidebarB() {
                     </div>
                   )}
 
-                  {/* Insert action cards — clause individual, definitions grouped */}
-                  {insertItems.length > 0 && (
-                    <>
-                      {insertItems
-                        .filter((i) => i.type === 'clause')
-                        .map((item) => (
+                  {/* Insert action cards — one clause card + one definition group card per batch */}
+                  {insertBatches.map((batch, batchIdx) => {
+                    const isActive = batchIdx === insertBatches.length - 1
+                    const batchPhase = isActive ? insertPhase : 'done'
+                    const clauseItems = batch.items.filter((i) => i.type === 'clause')
+                    const defItems = batch.items.filter((i) => i.type === 'definition')
+                    return (
+                      <Fragment key={batch.id}>
+                        {clauseItems.map((item) => (
                           <InsertItemCard
                             key={item.id}
                             item={item}
@@ -842,17 +925,18 @@ export function ActionSpaceSidebarB() {
                             onUndo={handleUndo}
                           />
                         ))}
-                      {insertItems.some((i) => i.type === 'definition') && (
-                        <DefinitionGroupCard
-                          items={insertItems.filter((i) => i.type === 'definition')}
-                          insertPhase={insertPhase}
-                          onStop={handleStop}
-                          onUndo={handleUndo}
-                          onUndoAll={handleUndoAll}
-                        />
-                      )}
-                    </>
-                  )}
+                        {defItems.length > 0 && (
+                          <DefinitionGroupCard
+                            items={defItems}
+                            insertPhase={batchPhase}
+                            onStop={handleStop}
+                            onUndo={handleUndo}
+                            onUndoAll={() => handleUndoAll(batch.id)}
+                          />
+                        )}
+                      </Fragment>
+                    )
+                  })}
                 </>
               )}
               </div>
@@ -916,7 +1000,7 @@ export function ActionSpaceSidebarB() {
               )}
 
               <div className="px-3 py-3">
-                <ChatInput onSend={() => { setChatPhase('confirming'); setShowConfirmation(true) }} placeholder="Ask Enhance" rows={2} inputRef={chatInputRef} attachedFiles={uploadedFiles} onRemoveFile={(i) => setUploadedFiles((prev) => prev.filter((_, idx) => idx !== i))} />
+                <ChatInput onSend={() => { setChatPhase('confirming'); setShowConfirmation(true) }} placeholder="Ask Enhance" rows={2} inputRef={chatInputRef} attachedFiles={uploadedFiles} onRemoveFile={(i) => setUploadedFiles((prev) => prev.filter((_, idx) => idx !== i))} savedPrompts={savedPrompts} />
               </div>
             </div>
           </div>
