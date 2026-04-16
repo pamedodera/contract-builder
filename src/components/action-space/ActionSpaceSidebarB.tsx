@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, Fragment } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { cn } from '@/lib/utils'
 import { Plus, ChevronDown, ChevronUp, ChevronRight, ArrowRight, Check, Loader2, Undo2, FileText, Upload, FileUp, BookmarkPlus, Bookmark } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -665,15 +665,11 @@ export function ActionSpaceSidebarB() {
       <div className="flex items-center shrink-0">
         <Button variant="default" size="default" className="rounded-r-none" onClick={handleInsert}>Insert edit</Button>
         <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="default"
-              size="default"
-              className="rounded-l-none border-l border-primary-foreground/20 px-2"
-              aria-label="More insert options"
-            >
-              <ChevronDown className="h-3.5 w-3.5" />
-            </Button>
+          <PopoverTrigger
+            className={buttonVariants({ variant: 'default', size: 'default', className: 'rounded-l-none border-l border-primary-foreground/20 px-2' })}
+            aria-label="More insert options"
+          >
+            <ChevronDown className="h-3.5 w-3.5" />
           </PopoverTrigger>
           <PopoverContent align="end" className="w-52 p-1">
             <Button variant="ghost" size="default" className="w-full justify-start">

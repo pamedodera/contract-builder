@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -74,7 +74,6 @@ export function ClauseCard() {
   )
 
   const allChecked = definitions.every((d) => checked[d.id])
-  const someChecked = definitions.some((d) => checked[d.id])
   const checkedCount = definitions.filter((d) => checked[d.id]).length
 
   function toggleSelectAll() {
@@ -206,15 +205,11 @@ export function ClauseCard() {
             Insert edit
           </Button>
           <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="default"
-                size="default"
-                className="rounded-l-none border-l border-primary-foreground/20 px-2"
-                aria-label="More insert options"
-              >
-                <ChevronDown className="h-3.5 w-3.5" />
-              </Button>
+            <PopoverTrigger
+              className={buttonVariants({ variant: 'default', size: 'default', className: 'rounded-l-none border-l border-primary-foreground/20 px-2' })}
+              aria-label="More insert options"
+            >
+              <ChevronDown className="h-3.5 w-3.5" />
             </PopoverTrigger>
             <PopoverContent align="end" className="w-52 p-1">
               <Button variant="ghost" size="default" className="w-full justify-start">
