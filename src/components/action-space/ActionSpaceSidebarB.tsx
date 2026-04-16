@@ -412,6 +412,7 @@ export function ActionSpaceSidebarB() {
   const dragCounterRef = useRef<number>(0)
   const pendingFileRef = useRef<string>('')
   const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[]>([])
+  const [uploadingFile, setUploadingFile] = useState('')
 
   const allChecked = definitions.every((d) => checked[d.id])
   const checkedCount = definitions.filter((d) => checked[d.id]).length
@@ -595,9 +596,11 @@ export function ActionSpaceSidebarB() {
   // Transition to chat after upload completes, then focus the input
   useEffect(() => {
     if (dragState !== 'uploading') return
-    const t = setTimeout(() => {
+    const tTransition = setTimeout(() => {
       if (pendingFileRef.current) {
-        setUploadedFiles((prev) => [...prev, pendingFileRef.current])
+        const fileName = pendingFileRef.current
+        setUploadedFiles((prev) => [...prev, fileName])
+        setUploadingFile(fileName)
         pendingFileRef.current = ''
       }
       setMode('chat')
@@ -605,7 +608,9 @@ export function ActionSpaceSidebarB() {
       setDragState('idle')
       setTimeout(() => chatInputRef.current?.focus(), 50)
     }, 2400)
-    return () => clearTimeout(t)
+    // Clear uploading state after chip fill animation completes (~1.5s fill + 0.1s buffer)
+    const tClearUploading = setTimeout(() => setUploadingFile(''), 2400 + 1600)
+    return () => { clearTimeout(tTransition); clearTimeout(tClearUploading) }
   }, [dragState])
 
   // Reset counter whenever drag state returns to idle
@@ -633,8 +638,18 @@ export function ActionSpaceSidebarB() {
     e.preventDefault()
     dragCounterRef.current = 0
     const file = e.dataTransfer.files[0]
-    pendingFileRef.current = file?.name ?? 'document'
-    setDragState('uploading')
+    const fileName = file?.name ?? 'document'
+    if (mode === 'chat') {
+      // Already in chat: chip appears immediately with fill animation, no overlay needed
+      setUploadedFiles((prev) => [...prev, fileName])
+      setUploadingFile(fileName)
+      setDragState('idle')
+      setTimeout(() => setUploadingFile(''), 1600)
+    } else {
+      // Not in chat: show full overlay, add chip on transition
+      pendingFileRef.current = fileName
+      setDragState('uploading')
+    }
   }
 
   const insertSummary = checkedCount === 0
@@ -731,9 +746,9 @@ export function ActionSpaceSidebarB() {
       >
 
         {/* ── Drag-and-drop overlay ── */}
-        {/* Uploading while in chat mode uses the inline card below instead of the full overlay */}
+        {/* Suppressed in chat mode — chip fill animation starts immediately on drop instead */}
         <AnimatePresence>
-          {(dragState === 'dragging' || (dragState === 'uploading' && mode !== 'chat')) && (
+          {mode !== 'chat' && (dragState === 'dragging' || dragState === 'uploading') && (
             <motion.div
               key="drag-overlay"
               className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-sidebar/90 backdrop-blur-sm"
@@ -945,34 +960,6 @@ export function ActionSpaceSidebarB() {
             {/* Sticky bottom */}
             <div className="shrink-0 border-t border-border flex flex-col bg-background">
 
-              {/* Inline upload progress card — shown when uploading while already in chat mode */}
-              <AnimatePresence>
-                {dragState === 'uploading' && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 6 }}
-                    transition={{ type: 'spring', bounce: 0.2, duration: 0.3 }}
-                    className="px-3 pt-3"
-                  >
-                    <div className="rounded-lg border border-border bg-background px-3 py-2.5 flex flex-col gap-2">
-                      <div className="flex items-center gap-2">
-                        <FileUp className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                        <p className="text-sm font-medium text-foreground">Adding document...</p>
-                      </div>
-                      <div className="h-1 w-full rounded-full bg-border overflow-hidden">
-                        <motion.div
-                          className="h-full rounded-full bg-primary"
-                          initial={{ width: '0%' }}
-                          animate={{ width: '100%' }}
-                          transition={{ duration: 2, ease: 'easeInOut' }}
-                        />
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
               {/* Confirmation card — only during confirming phase, after step 3 */}
               {chatPhase === 'confirming' && agentStep >= 3 && showConfirmation && (
                 <div className="px-3 pt-3 pb-2">
@@ -1000,7 +987,7 @@ export function ActionSpaceSidebarB() {
               )}
 
               <div className="px-3 py-3">
-                <ChatInput onSend={() => { setChatPhase('confirming'); setShowConfirmation(true) }} placeholder="Ask Enhance" rows={2} inputRef={chatInputRef} attachedFiles={uploadedFiles} onRemoveFile={(i) => setUploadedFiles((prev) => prev.filter((_, idx) => idx !== i))} savedPrompts={savedPrompts} />
+                <ChatInput onSend={() => { setChatPhase('confirming'); setShowConfirmation(true) }} placeholder="Ask Enhance" rows={2} inputRef={chatInputRef} attachedFiles={uploadedFiles} onRemoveFile={(i) => setUploadedFiles((prev) => prev.filter((_, idx) => idx !== i))} savedPrompts={savedPrompts} uploadingFile={uploadingFile} isDragActive={dragState === 'dragging'} />
               </div>
             </div>
           </div>

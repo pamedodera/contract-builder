@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
-import { Paperclip, BookOpen, ArrowUp, FileText, X } from 'lucide-react'
+import { Paperclip, BookOpen, ArrowUp, FileText, X, Loader2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -16,6 +16,60 @@ const defaultPrompts = [
 
 export type SavedPrompt = { id: string; label: string; prompt: string }
 
+// Chip with a spinner in place of the remove button while the file is uploading.
+// Once upload completes the spinner crossfades into the X button.
+function FileChip({
+  file,
+  index,
+  isUploading,
+  onRemove,
+}: {
+  file: string
+  index: number
+  isUploading: boolean
+  onRemove: () => void
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.85, y: 4 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{ type: 'spring', bounce: 0.35, delay: 0.08 + index * 0.07 }}
+      className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 shrink-0"
+    >
+      <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+      <span className="text-xs text-foreground max-w-[120px] truncate">{file}</span>
+      <AnimatePresence mode="wait" initial={false}>
+        {isUploading ? (
+          <motion.span
+            key="spinner"
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.5 }}
+            transition={{ duration: 0.15 }}
+            className="ml-0.5 shrink-0 flex items-center"
+          >
+            <Loader2 className="h-3 w-3 text-muted-foreground animate-spin" />
+          </motion.span>
+        ) : (
+          <motion.button
+            key="remove"
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.5 }}
+            transition={{ duration: 0.15 }}
+            type="button"
+            onClick={onRemove}
+            className="ml-0.5 shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+            aria-label={`Remove ${file}`}
+          >
+            <X className="h-3 w-3" />
+          </motion.button>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  )
+}
+
 interface ChatInputProps {
   onSend: (text: string) => void
   placeholder?: string
@@ -24,9 +78,11 @@ interface ChatInputProps {
   attachedFiles?: string[]
   onRemoveFile?: (index: number) => void
   savedPrompts?: SavedPrompt[]
+  uploadingFile?: string
+  isDragActive?: boolean
 }
 
-export function ChatInput({ onSend, placeholder = 'Ask the AI assistant…', rows = 1, inputRef, attachedFiles = [], onRemoveFile, savedPrompts = [] }: ChatInputProps) {
+export function ChatInput({ onSend, placeholder = 'Ask the AI assistant…', rows = 1, inputRef, attachedFiles = [], onRemoveFile, savedPrompts = [], uploadingFile, isDragActive }: ChatInputProps) {
   const [value, setValue] = useState('')
   const [promptOpen, setPromptOpen] = useState(false)
   const [overflowOpen, setOverflowOpen] = useState(false)
@@ -117,9 +173,81 @@ export function ChatInput({ onSend, placeholder = 'Ask the AI assistant…', row
       className={cn(
         'rounded-md border bg-background transition-colors duration-300',
         focused ? 'border-ring ring-1 ring-ring/30' : 'border-input',
-        highlighted && !focused && 'border-ring ring-2 ring-ring/50'
+        highlighted && !focused && 'border-ring ring-2 ring-ring/50',
+        isDragActive && !focused && 'border-ring ring-2 ring-ring/40'
       )}
     >
+      {/* Attached files section — above textarea
+          AnimatePresence without initial={false} so the animation plays on first mount */}
+      <AnimatePresence>
+        {attachedFiles.length > 0 && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22, ease: [0.25, 0, 0, 1] }}
+            style={{ overflow: 'hidden' }}
+          >
+            <div className="border-b border-input px-2 pt-2 pb-1.5">
+              <div className="relative">
+                {/* Hidden measurement layer */}
+                <div
+                  ref={measureRef}
+                  className="absolute top-0 left-0 w-full invisible flex gap-1.5 pointer-events-none"
+                  aria-hidden="true"
+                >
+                  {attachedFiles.map((file, i) => (
+                    <div key={i} data-chip className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 shrink-0">
+                      <FileText className="h-3.5 w-3.5 shrink-0" />
+                      <span className="text-xs max-w-[120px] truncate whitespace-nowrap">{file}</span>
+                      <div className="h-3 w-3 ml-0.5 shrink-0" />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Visible chip row — each chip springs in with a stagger */}
+                <div ref={containerRef} className="flex items-center gap-1.5">
+                  {attachedFiles.slice(0, visibleCount).map((file, i) => (
+                    <FileChip
+                      key={file + i}
+                      file={file}
+                      index={i}
+                      isUploading={uploadingFile === file}
+                      onRemove={() => onRemoveFile?.(i)}
+                    />
+                  ))}
+
+                  {overflowCount > 0 && (
+                    <Popover open={overflowOpen} onOpenChange={setOverflowOpen}>
+                      <PopoverTrigger className="inline-flex items-center rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors shrink-0">
+                        +{overflowCount}
+                      </PopoverTrigger>
+                      <PopoverContent side="top" align="end" className="w-56 p-1">
+                        <p className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Attached Files</p>
+                        {attachedFiles.slice(visibleCount).map((file, i) => (
+                          <div key={file + i} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent group">
+                            <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                            <span className="flex-1 text-sm truncate">{file}</span>
+                            <button
+                              type="button"
+                              onClick={() => { onRemoveFile?.(visibleCount + i); setOverflowOpen(false) }}
+                              className="text-muted-foreground hover:text-foreground transition-colors opacity-0 group-hover:opacity-100 shrink-0"
+                              aria-label={`Remove ${file}`}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Textarea row */}
       <div className="flex items-center gap-1 p-2">
         <textarea
@@ -188,88 +316,6 @@ export function ChatInput({ onSend, placeholder = 'Ask the AI assistant…', row
         </Button>
       </div>
 
-      {/* Attached files section
-          AnimatePresence without initial={false} so the animation plays on first mount
-          (i.e. when the user lands in chat after uploading a document) */}
-      <AnimatePresence>
-        {attachedFiles.length > 0 && (
-          // clipPath wipes the section into view from the bottom — the "create button" reveal
-          <motion.div
-            initial={{ clipPath: 'inset(0 100% 0 0 round 6px)', opacity: 0 }}
-            animate={{ clipPath: 'inset(0 0% 0 0 round 6px)', opacity: 1 }}
-            exit={{ clipPath: 'inset(0 100% 0 0 round 6px)', opacity: 0 }}
-            transition={{ type: 'spring', bounce: 0.15, duration: 0.5 }}
-          >
-            <div className="border-t border-input px-2 pb-2 pt-1.5">
-              <div className="relative">
-                {/* Hidden measurement layer */}
-                <div
-                  ref={measureRef}
-                  className="absolute top-0 left-0 w-full invisible flex gap-1.5 pointer-events-none"
-                  aria-hidden="true"
-                >
-                  {attachedFiles.map((file, i) => (
-                    <div key={i} data-chip className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 shrink-0">
-                      <FileText className="h-3.5 w-3.5 shrink-0" />
-                      <span className="text-xs max-w-[120px] truncate whitespace-nowrap">{file}</span>
-                      <div className="h-3 w-3 ml-0.5 shrink-0" />
-                    </div>
-                  ))}
-                </div>
-
-                {/* Visible chip row — each chip springs in with a stagger */}
-                <div ref={containerRef} className="flex items-center gap-1.5">
-                  {attachedFiles.slice(0, visibleCount).map((file, i) => (
-                    <motion.div
-                      key={file + i}
-                      initial={{ opacity: 0, scale: 0.85, y: 4 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      transition={{ type: 'spring', bounce: 0.35, delay: 0.08 + i * 0.07 }}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 shrink-0"
-                    >
-                      <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                      <span className="text-xs text-foreground max-w-[120px] truncate">{file}</span>
-                      <button
-                        type="button"
-                        onClick={() => onRemoveFile?.(i)}
-                        className="ml-0.5 text-muted-foreground hover:text-foreground transition-colors shrink-0"
-                        aria-label={`Remove ${file}`}
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </motion.div>
-                  ))}
-
-                  {overflowCount > 0 && (
-                    <Popover open={overflowOpen} onOpenChange={setOverflowOpen}>
-                      <PopoverTrigger className="inline-flex items-center rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors shrink-0">
-                        +{overflowCount}
-                      </PopoverTrigger>
-                      <PopoverContent side="top" align="end" className="w-56 p-1">
-                        <p className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Attached Files</p>
-                        {attachedFiles.slice(visibleCount).map((file, i) => (
-                          <div key={file + i} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent group">
-                            <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                            <span className="flex-1 text-sm truncate">{file}</span>
-                            <button
-                              type="button"
-                              onClick={() => { onRemoveFile?.(visibleCount + i); setOverflowOpen(false) }}
-                              className="text-muted-foreground hover:text-foreground transition-colors opacity-0 group-hover:opacity-100 shrink-0"
-                              aria-label={`Remove ${file}`}
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </div>
-                        ))}
-                      </PopoverContent>
-                    </Popover>
-                  )}
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </motion.div>
   )
 }
