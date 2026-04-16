@@ -405,6 +405,7 @@ export function ActionSpaceSidebarB() {
   const [dragState, setDragState] = useState<DragState>('idle')
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([])
   const dragCounterRef = useRef<number>(0)
+  const pendingFileRef = useRef<string>('')
 
   const allChecked = definitions.every((d) => checked[d.id])
   const checkedCount = definitions.filter((d) => checked[d.id]).length
@@ -535,6 +536,10 @@ export function ActionSpaceSidebarB() {
   useEffect(() => {
     if (dragState !== 'uploading') return
     const t = setTimeout(() => {
+      if (pendingFileRef.current) {
+        setUploadedFiles((prev) => [...prev, pendingFileRef.current])
+        pendingFileRef.current = ''
+      }
       setMode('chat')
       setView('main')
       setDragState('idle')
@@ -568,7 +573,7 @@ export function ActionSpaceSidebarB() {
     e.preventDefault()
     dragCounterRef.current = 0
     const file = e.dataTransfer.files[0]
-    setUploadedFiles((prev) => [...prev, file?.name ?? 'document'])
+    pendingFileRef.current = file?.name ?? 'document'
     setDragState('uploading')
   }
 
@@ -666,8 +671,9 @@ export function ActionSpaceSidebarB() {
       >
 
         {/* ── Drag-and-drop overlay ── */}
+        {/* Uploading while in chat mode uses the inline card below instead of the full overlay */}
         <AnimatePresence>
-          {dragState !== 'idle' && (
+          {(dragState === 'dragging' || (dragState === 'uploading' && mode !== 'chat')) && (
             <motion.div
               key="drag-overlay"
               className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-sidebar/90 backdrop-blur-sm"
@@ -854,6 +860,34 @@ export function ActionSpaceSidebarB() {
 
             {/* Sticky bottom */}
             <div className="shrink-0 border-t border-border flex flex-col bg-background">
+
+              {/* Inline upload progress card — shown when uploading while already in chat mode */}
+              <AnimatePresence>
+                {dragState === 'uploading' && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 6 }}
+                    transition={{ type: 'spring', bounce: 0.2, duration: 0.3 }}
+                    className="px-3 pt-3"
+                  >
+                    <div className="rounded-lg border border-border bg-background px-3 py-2.5 flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <FileUp className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        <p className="text-sm font-medium text-foreground">Adding document...</p>
+                      </div>
+                      <div className="h-1 w-full rounded-full bg-border overflow-hidden">
+                        <motion.div
+                          className="h-full rounded-full bg-primary"
+                          initial={{ width: '0%' }}
+                          animate={{ width: '100%' }}
+                          transition={{ duration: 2, ease: 'easeInOut' }}
+                        />
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Confirmation card — only during confirming phase, after step 3 */}
               {chatPhase === 'confirming' && agentStep >= 3 && showConfirmation && (
