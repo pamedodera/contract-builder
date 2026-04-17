@@ -1067,7 +1067,7 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, se
 
             {/* Floating Ask/Edit buttons — outside the white bg-background container */}
             {selectedText && (
-              <div className="absolute left-3 flex gap-2 z-10" style={{ bottom: inputAreaHeight + 32 }}>
+              <div className="absolute left-3 flex gap-2 z-10" style={{ bottom: inputAreaHeight + 56 }}>
                 <button
                   type="button"
                   onClick={() => onAskContext?.(selectedText)}
