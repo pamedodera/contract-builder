@@ -6,17 +6,9 @@ import { ActionSpaceSidebar } from '@/components/action-space/ActionSpaceSidebar
 import { ActionSpaceSidebarB } from '@/components/action-space/ActionSpaceSidebarB'
 import { DocumentViewer } from '@/components/document/DocumentViewer'
 import { WordShell } from '@/components/word-shell/WordShell'
-import { cn } from '@/lib/utils'
-
-const flows = [
-  { id: 'definely-brand', label: 'Future Proposals' },
-  { id: 'action-space', label: 'Actions Flow' },
-  { id: 'action-space-b', label: 'Actions Flow - Option B' },
-  { id: 'word-shell', label: 'Word Shell' },
-]
 
 function App() {
-  const [activeFlow, setActiveFlow] = useState(
+  const [activeFlow] = useState(
     new URLSearchParams(window.location.search).get('flow') ?? 'action-space-b'
   )
   const [contextChips, setContextChips] = useState<{ id: string; text: string }[]>([])
@@ -31,24 +23,6 @@ function App() {
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden">
-
-      {/* ── Top nav ── */}
-      <nav className="shrink-0 flex items-center gap-1 border-b border-border bg-background px-4 h-12">
-        {flows.map((flow) => (
-          <button
-            key={flow.id}
-            onClick={() => setActiveFlow(flow.id)}
-            className={cn(
-              'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-              activeFlow === flow.id
-                ? 'bg-accent text-accent-foreground'
-                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-            )}
-          >
-            {flow.label}
-          </button>
-        ))}
-      </nav>
 
       {/* ── Flow content ── */}
       <div className="flex flex-1 overflow-hidden">
