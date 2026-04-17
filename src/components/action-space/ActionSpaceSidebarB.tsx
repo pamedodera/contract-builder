@@ -417,6 +417,15 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip }: 
   const [insertStep, setInsertStep] = useState(-1)
   const insertBatchRef = useRef<InsertBatch | null>(null)
   const chatInputRef = useRef<HTMLTextAreaElement>(null)
+  const chatScrollRef = useRef<HTMLDivElement>(null)
+
+  function scrollChatToBottom() {
+    requestAnimationFrame(() => {
+      if (chatScrollRef.current) {
+        chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight
+      }
+    })
+  }
   const [showConfirmation, setShowConfirmation] = useState(true)
   const [dragState, setDragState] = useState<DragState>('idle')
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([])
@@ -555,6 +564,7 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip }: 
     setInsertPhase('running')
     setMode('chat')
     setView('main')
+    scrollChatToBottom()
   }
 
   function handleStop() {
@@ -634,6 +644,7 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip }: 
       setMode('chat')
       setView('main')
       setDragState('idle')
+      scrollChatToBottom()
       setTimeout(() => chatInputRef.current?.focus(), 50)
     }, 2400)
     // Clear uploading state after chip fill animation completes (~1.5s fill + 0.1s buffer)
@@ -890,7 +901,7 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip }: 
         {/* ── Chat mode ── */}
         {mode === 'chat' && (
           <div className="flex-1 flex flex-col min-h-0">
-            <div className="flex-1 overflow-y-auto min-h-0">
+            <div ref={chatScrollRef} className="flex-1 overflow-y-auto min-h-0">
               {/* Working on Edit Space — sticky at top of scroll area, content scrolls under */}
               {agentStep >= 6 && hasVisitedEditSpace && (
                 <div className="sticky top-0 z-10 px-3 pb-2">
