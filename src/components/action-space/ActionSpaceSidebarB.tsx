@@ -396,9 +396,12 @@ function DefinitionGroupCard({
 interface ActionSpaceSidebarBProps {
   contextChips?: { id: string; text: string }[]
   onRemoveContextChip?: (id: string) => void
+  selectedText?: string
+  onAskContext?: (text: string) => void
+  onEditContext?: (text: string) => void
 }
 
-export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip }: ActionSpaceSidebarBProps) {
+export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, selectedText = '', onAskContext, onEditContext }: ActionSpaceSidebarBProps) {
   const [activeTab, setActiveTab] = useState<Tab>('enhance')
   const [view, setView] = useState<View>('main')
   const [mode, setMode] = useState<Mode>('chat')
@@ -1080,22 +1083,26 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip }: 
               )}
 
               <div className="px-3 pb-3 flex flex-col gap-2">
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    className="flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-                  >
-                    <MessageSquare className="h-3.5 w-3.5 shrink-0" />
-                    Ask
-                  </button>
-                  <button
-                    type="button"
-                    className="flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-                  >
-                    <Pencil className="h-3.5 w-3.5 shrink-0" />
-                    Edit
-                  </button>
-                </div>
+                {selectedText && (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onAskContext?.(selectedText)}
+                      className="flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                    >
+                      <MessageSquare className="h-3.5 w-3.5 shrink-0" />
+                      Ask
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onEditContext?.(selectedText)}
+                      className="flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                    >
+                      <Pencil className="h-3.5 w-3.5 shrink-0" />
+                      Edit
+                    </button>
+                  </div>
+                )}
                 <ChatInput onSend={(text) => { setSelectedActionLabel(text); setChatPhase('confirming'); setShowConfirmation(true) }} placeholder="Ask Enhance" rows={2} inputRef={chatInputRef} attachedFiles={uploadedFiles} onRemoveFile={(i) => setUploadedFiles((prev) => prev.filter((_, idx) => idx !== i))} promptToApply={appliedPrompt} uploadingFile={uploadingFile} isDragActive={dragState === 'dragging'} contextChips={contextChips} onRemoveContextChip={onRemoveContextChip} />
               </div>
             </div>

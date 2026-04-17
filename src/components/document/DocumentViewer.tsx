@@ -7,6 +7,7 @@ interface DocumentViewerProps {
   onTermClick?: (termId: string) => void
   onAskContext?: (text: string) => void
   onEditContext?: (text: string) => void
+  onSelectionChange?: (text: string) => void
 }
 
 function renderInline(nodes: RichText, onTermClick?: (termId: string) => void) {
@@ -181,8 +182,17 @@ function renderBlock(block: DocumentBlock, onTermClick?: (termId: string) => voi
   return null
 }
 
-export function DocumentViewer({ onTermClick, onAskContext, onEditContext }: DocumentViewerProps) {
+export function DocumentViewer({ onTermClick, onAskContext, onEditContext, onSelectionChange }: DocumentViewerProps) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; text: string } | null>(null)
+
+  useEffect(() => {
+    function handleSelectionChange() {
+      const text = window.getSelection()?.toString().trim() ?? ''
+      onSelectionChange?.(text)
+    }
+    document.addEventListener('selectionchange', handleSelectionChange)
+    return () => document.removeEventListener('selectionchange', handleSelectionChange)
+  }, [onSelectionChange])
 
   useEffect(() => {
     if (!contextMenu) return

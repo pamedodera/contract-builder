@@ -12,6 +12,7 @@ function App() {
     new URLSearchParams(window.location.search).get('flow') ?? 'word-shell'
   )
   const [contextChips, setContextChips] = useState<{ id: string; text: string }[]>([])
+  const [selectedText, setSelectedText] = useState('')
 
   const handleAddContext = useCallback((text: string) => {
     setContextChips((prev) => [...prev, { id: `ctx-${Date.now()}`, text }])
@@ -65,17 +66,18 @@ function App() {
         {activeFlow === 'action-space-b' && (
           <>
             <main className="flex w-2/3 overflow-hidden">
-              <DocumentViewer onTermClick={() => {}} onAskContext={handleAddContext} onEditContext={handleAddContext} />
+              <DocumentViewer onTermClick={() => {}} onAskContext={handleAddContext} onEditContext={handleAddContext} onSelectionChange={setSelectedText} />
             </main>
-            <ActionSpaceSidebarB contextChips={contextChips} onRemoveContextChip={handleRemoveContextChip} />
+            <ActionSpaceSidebarB contextChips={contextChips} onRemoveContextChip={handleRemoveContextChip} selectedText={selectedText} onAskContext={handleAddContext} onEditContext={handleAddContext} />
           </>
         )}
         {activeFlow === 'word-shell' && (
           <WordShell
             onAskContext={handleAddContext}
             onEditContext={handleAddContext}
+            onSelectionChange={setSelectedText}
             sidebar={
-              <ActionSpaceSidebarB contextChips={contextChips} onRemoveContextChip={handleRemoveContextChip} />
+              <ActionSpaceSidebarB contextChips={contextChips} onRemoveContextChip={handleRemoveContextChip} selectedText={selectedText} onAskContext={handleAddContext} onEditContext={handleAddContext} />
             }
           />
         )}

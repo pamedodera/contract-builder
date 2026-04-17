@@ -71,9 +71,10 @@ interface WordShellProps {
   sidebar: React.ReactNode
   onAskContext?: (text: string) => void
   onEditContext?: (text: string) => void
+  onSelectionChange?: (text: string) => void
 }
 
-export function WordShell({ sidebar, onAskContext, onEditContext }: WordShellProps) {
+export function WordShell({ sidebar, onAskContext, onEditContext, onSelectionChange }: WordShellProps) {
   return (
     <div className="flex flex-col flex-1 overflow-hidden" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
 
@@ -475,6 +476,7 @@ export function WordShell({ sidebar, onAskContext, onEditContext }: WordShellPro
               onTermClick={() => {}}
               onAskContext={onAskContext}
               onEditContext={onEditContext}
+              onSelectionChange={onSelectionChange}
             />
           </div>
         </div>
