@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, Fragment } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { cn } from '@/lib/utils'
-import { Plus, ChevronDown, ChevronUp, ChevronRight, ArrowRight, Check, Loader2, Undo2, FileText, Upload, FileUp, BookmarkPlus, Bookmark } from 'lucide-react'
+import { Plus, ChevronDown, ChevronUp, ChevronRight, ArrowRight, Check, Loader2, Undo2, FileText, Upload, FileUp, BookmarkPlus, Bookmark, MessageSquare, Pencil } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -1079,7 +1079,23 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip }: 
                 </div>
               )}
 
-              <div className="px-3 py-3">
+              <div className="px-3 pb-3 flex flex-col gap-2">
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                  >
+                    <MessageSquare className="h-3.5 w-3.5 shrink-0" />
+                    Ask
+                  </button>
+                  <button
+                    type="button"
+                    className="flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                  >
+                    <Pencil className="h-3.5 w-3.5 shrink-0" />
+                    Edit
+                  </button>
+                </div>
                 <ChatInput onSend={(text) => { setSelectedActionLabel(text); setChatPhase('confirming'); setShowConfirmation(true) }} placeholder="Ask Enhance" rows={2} inputRef={chatInputRef} attachedFiles={uploadedFiles} onRemoveFile={(i) => setUploadedFiles((prev) => prev.filter((_, idx) => idx !== i))} promptToApply={appliedPrompt} uploadingFile={uploadingFile} isDragActive={dragState === 'dragging'} contextChips={contextChips} onRemoveContextChip={onRemoveContextChip} />
               </div>
             </div>
