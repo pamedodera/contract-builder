@@ -609,6 +609,10 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip }: 
     setSavedPrompts((prev) => [{ id: `saved-${Date.now()}`, label, prompt: text }, ...prev])
   }
 
+  function handleRemoveSavedPrompt(text: string) {
+    setSavedPrompts((prev) => prev.filter((p) => p.prompt !== text))
+  }
+
   function handleActionClick(actionId: string, label: string) {
     setSelectedActionLabel(label)
     if (actionId === 'analyse') {
@@ -924,24 +928,27 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip }: 
                   {(() => {
                     const label = selectedActionLabel as string
                     const isSaved = savedPrompts.some((p) => p.prompt === label)
+                    const isPredefined = predefinedActions.some((a) => a.prompt === label)
                     return (
                       <div className="flex justify-end group/msg">
                         <div className="flex flex-col items-end gap-1 w-full">
                           <div className="w-full rounded-xl rounded-tr-sm bg-[#B8C1DE] text-foreground px-3 py-2 text-[16px] leading-relaxed">
                             {label}
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => handleSavePrompt(label)}
-                            className="opacity-0 group-hover/msg:opacity-100 transition-opacity flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-                            aria-label="Save as prompt"
-                          >
-                            {isSaved
-                              ? <Bookmark className="h-3 w-3 fill-current" />
-                              : <BookmarkPlus className="h-3 w-3" />
-                            }
-                            {isSaved ? 'Saved' : 'Save'}
-                          </button>
+                          {!isPredefined && (
+                            <button
+                              type="button"
+                              onClick={() => isSaved ? handleRemoveSavedPrompt(label) : handleSavePrompt(label)}
+                              className="opacity-0 group-hover/msg:opacity-100 transition-opacity flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                              aria-label={isSaved ? 'Remove from Saved Prompts' : 'Save prompt'}
+                            >
+                              {isSaved
+                                ? <Bookmark className="h-3 w-3 fill-current" />
+                                : <BookmarkPlus className="h-3 w-3" />
+                              }
+                              {isSaved ? 'Remove from Saved Prompts' : 'Save prompt'}
+                            </button>
+                          )}
                         </div>
                       </div>
                     )
