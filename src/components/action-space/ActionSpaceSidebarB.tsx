@@ -421,6 +421,8 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, se
   const insertBatchRef = useRef<InsertBatch | null>(null)
   const chatInputRef = useRef<HTMLTextAreaElement>(null)
   const chatScrollRef = useRef<HTMLDivElement>(null)
+  const chatInputAreaRef = useRef<HTMLDivElement>(null)
+  const [inputAreaHeight, setInputAreaHeight] = useState(88)
 
   function scrollChatToBottom() {
     requestAnimationFrame(() => {
@@ -429,6 +431,14 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, se
       }
     })
   }
+
+  useEffect(() => {
+    const el = chatInputAreaRef.current
+    if (!el) return
+    const observer = new ResizeObserver(([entry]) => setInputAreaHeight(entry.contentRect.height))
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
   const [showConfirmation, setShowConfirmation] = useState(true)
   const [dragState, setDragState] = useState<DragState>('idle')
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([])
@@ -903,7 +913,7 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, se
 
         {/* ── Chat mode ── */}
         {mode === 'chat' && (
-          <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex-1 flex flex-col min-h-0 relative">
             <div ref={chatScrollRef} className="flex-1 overflow-y-auto min-h-0">
               {/* Working on Edit Space — sticky at top of scroll area, content scrolls under */}
               {agentStep >= 6 && hasVisitedEditSpace && (
@@ -1082,27 +1092,27 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, se
                 </div>
               )}
 
-              <div className="px-3 pb-3 flex flex-col gap-2">
-                {selectedText && (
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => onAskContext?.(selectedText)}
-                      className="flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-                    >
-                      <MessageSquare className="h-3.5 w-3.5 shrink-0" />
-                      Ask
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onEditContext?.(selectedText)}
-                      className="flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-                    >
-                      <Pencil className="h-3.5 w-3.5 shrink-0" />
-                      Edit
-                    </button>
-                  </div>
-                )}
+              {selectedText && (
+                <div className="absolute left-3 flex gap-2 z-10" style={{ bottom: inputAreaHeight + 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => onAskContext?.(selectedText)}
+                    className="flex items-center gap-1.5 rounded-full border border-border bg-background shadow-sm px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                  >
+                    <MessageSquare className="h-3.5 w-3.5 shrink-0" />
+                    Ask
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onEditContext?.(selectedText)}
+                    className="flex items-center gap-1.5 rounded-full border border-border bg-background shadow-sm px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                  >
+                    <Pencil className="h-3.5 w-3.5 shrink-0" />
+                    Edit
+                  </button>
+                </div>
+              )}
+              <div ref={chatInputAreaRef} className="px-3 pb-3">
                 <ChatInput onSend={(text) => { setSelectedActionLabel(text); setChatPhase('confirming'); setShowConfirmation(true) }} placeholder="Ask Enhance" rows={2} inputRef={chatInputRef} attachedFiles={uploadedFiles} onRemoveFile={(i) => setUploadedFiles((prev) => prev.filter((_, idx) => idx !== i))} promptToApply={appliedPrompt} uploadingFile={uploadingFile} isDragActive={dragState === 'dragging'} contextChips={contextChips} onRemoveContextChip={onRemoveContextChip} />
               </div>
             </div>
