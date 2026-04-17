@@ -5,12 +5,14 @@ import { DefinelySidebar } from '@/components/review/DefinelySidebar'
 import { ActionSpaceSidebar } from '@/components/action-space/ActionSpaceSidebar'
 import { ActionSpaceSidebarB } from '@/components/action-space/ActionSpaceSidebarB'
 import { DocumentViewer } from '@/components/document/DocumentViewer'
+import { WordShell } from '@/components/word-shell/WordShell'
 import { cn } from '@/lib/utils'
 
 const flows = [
   { id: 'definely-brand', label: 'Future Proposals' },
   { id: 'action-space', label: 'Actions Flow' },
   { id: 'action-space-b', label: 'Actions Flow - Option B' },
+  { id: 'word-shell', label: 'Word Shell' },
 ]
 
 function App() {
@@ -93,6 +95,15 @@ function App() {
             </main>
             <ActionSpaceSidebarB contextChips={contextChips} onRemoveContextChip={handleRemoveContextChip} />
           </>
+        )}
+        {activeFlow === 'word-shell' && (
+          <WordShell
+            onAskContext={handleAddContext}
+            onEditContext={handleAddContext}
+            sidebar={
+              <ActionSpaceSidebarB contextChips={contextChips} onRemoveContextChip={handleRemoveContextChip} />
+            }
+          />
         )}
       </div>
 
