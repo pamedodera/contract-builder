@@ -9,7 +9,7 @@ import { WordShell } from '@/components/word-shell/WordShell'
 
 function App() {
   const [activeFlow] = useState(
-    new URLSearchParams(window.location.search).get('flow') ?? 'action-space-b'
+    new URLSearchParams(window.location.search).get('flow') ?? 'word-shell'
   )
   const [contextChips, setContextChips] = useState<{ id: string; text: string }[]>([])
 
