@@ -435,7 +435,9 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, se
   useEffect(() => {
     const el = chatInputAreaRef.current
     if (!el) return
-    const observer = new ResizeObserver(([entry]) => setInputAreaHeight(entry.contentRect.height))
+    const update = () => setInputAreaHeight(el.offsetHeight)
+    update()
+    const observer = new ResizeObserver(update)
     observer.observe(el)
     return () => observer.disconnect()
   }, [])
@@ -1112,7 +1114,7 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, se
                   </button>
                 </div>
               )}
-              <div ref={chatInputAreaRef} className="px-3 pb-3">
+              <div ref={chatInputAreaRef} className={cn("px-3 pb-3", selectedText && "pt-10")}>
                 <ChatInput onSend={(text) => { setSelectedActionLabel(text); setChatPhase('confirming'); setShowConfirmation(true) }} placeholder="Ask Enhance" rows={2} inputRef={chatInputRef} attachedFiles={uploadedFiles} onRemoveFile={(i) => setUploadedFiles((prev) => prev.filter((_, idx) => idx !== i))} promptToApply={appliedPrompt} uploadingFile={uploadingFile} isDragActive={dragState === 'dragging'} contextChips={contextChips} onRemoveContextChip={onRemoveContextChip} />
               </div>
             </div>
