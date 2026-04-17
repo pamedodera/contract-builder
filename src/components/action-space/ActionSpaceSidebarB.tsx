@@ -1065,8 +1065,30 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, se
               </div>
             </div>
 
+            {/* Floating Ask/Edit buttons — outside the white bg-background container */}
+            {selectedText && (
+              <div className="absolute left-3 flex gap-2 z-10" style={{ bottom: inputAreaHeight + 8 }}>
+                <button
+                  type="button"
+                  onClick={() => onAskContext?.(selectedText)}
+                  className="flex items-center gap-1.5 rounded-full border border-border bg-background shadow-sm px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                >
+                  <MessageSquare className="h-3.5 w-3.5 shrink-0" />
+                  Ask
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onEditContext?.(selectedText)}
+                  className="flex items-center gap-1.5 rounded-full border border-border bg-background shadow-sm px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                >
+                  <Pencil className="h-3.5 w-3.5 shrink-0" />
+                  Edit
+                </button>
+              </div>
+            )}
+
             {/* Sticky bottom */}
-            <div className="shrink-0 border-t border-border flex flex-col bg-background">
+            <div ref={chatInputAreaRef} className="shrink-0 border-t border-border flex flex-col bg-background">
 
               {/* Confirmation card — only during confirming phase, after step 3 */}
               {chatPhase === 'confirming' && agentStep >= 3 && showConfirmation && (
@@ -1094,27 +1116,7 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, se
                 </div>
               )}
 
-              {selectedText && (
-                <div className="absolute left-3 flex gap-2 z-10" style={{ bottom: inputAreaHeight + 8 }}>
-                  <button
-                    type="button"
-                    onClick={() => onAskContext?.(selectedText)}
-                    className="flex items-center gap-1.5 rounded-full border border-border bg-background shadow-sm px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-                  >
-                    <MessageSquare className="h-3.5 w-3.5 shrink-0" />
-                    Ask
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onEditContext?.(selectedText)}
-                    className="flex items-center gap-1.5 rounded-full border border-border bg-background shadow-sm px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-                  >
-                    <Pencil className="h-3.5 w-3.5 shrink-0" />
-                    Edit
-                  </button>
-                </div>
-              )}
-              <div ref={chatInputAreaRef} className={cn("px-3 pb-3", selectedText && "pt-10")}>
+              <div className="px-3 pb-3 pt-3">
                 <ChatInput onSend={(text) => { setSelectedActionLabel(text); setChatPhase('confirming'); setShowConfirmation(true) }} placeholder="Ask Enhance" rows={2} inputRef={chatInputRef} attachedFiles={uploadedFiles} onRemoveFile={(i) => setUploadedFiles((prev) => prev.filter((_, idx) => idx !== i))} promptToApply={appliedPrompt} uploadingFile={uploadingFile} isDragActive={dragState === 'dragging'} contextChips={contextChips} onRemoveContextChip={onRemoveContextChip} />
               </div>
             </div>
