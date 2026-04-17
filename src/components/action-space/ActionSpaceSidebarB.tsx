@@ -393,7 +393,12 @@ function DefinitionGroupCard({
   )
 }
 
-export function ActionSpaceSidebarB() {
+interface ActionSpaceSidebarBProps {
+  contextChips?: { id: string; text: string }[]
+  onRemoveContextChip?: (id: string) => void
+}
+
+export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip }: ActionSpaceSidebarBProps) {
   const [activeTab, setActiveTab] = useState<Tab>('enhance')
   const [view, setView] = useState<View>('main')
   const [mode, setMode] = useState<Mode>('chat')
@@ -1055,7 +1060,7 @@ export function ActionSpaceSidebarB() {
               )}
 
               <div className="px-3 py-3">
-                <ChatInput onSend={() => { setChatPhase('confirming'); setShowConfirmation(true) }} placeholder="Ask Enhance" rows={2} inputRef={chatInputRef} attachedFiles={uploadedFiles} onRemoveFile={(i) => setUploadedFiles((prev) => prev.filter((_, idx) => idx !== i))} promptToApply={appliedPrompt} uploadingFile={uploadingFile} isDragActive={dragState === 'dragging'} />
+                <ChatInput onSend={(text) => { setSelectedActionLabel(text); setChatPhase('confirming'); setShowConfirmation(true) }} placeholder="Ask Enhance" rows={2} inputRef={chatInputRef} attachedFiles={uploadedFiles} onRemoveFile={(i) => setUploadedFiles((prev) => prev.filter((_, idx) => idx !== i))} promptToApply={appliedPrompt} uploadingFile={uploadingFile} isDragActive={dragState === 'dragging'} contextChips={contextChips} onRemoveContextChip={onRemoveContextChip} />
               </div>
             </div>
           </div>

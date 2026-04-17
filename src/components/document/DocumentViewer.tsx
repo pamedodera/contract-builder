@@ -1,8 +1,12 @@
+import { useState, useEffect } from 'react'
+import { MessageSquare, Pencil } from 'lucide-react'
 import type { RichText, SectionBlock, DocumentBlock, NumberedClause } from '@/data/mockDocument'
 import { mockDocument } from '@/data/mockDocument'
 
 interface DocumentViewerProps {
   onTermClick?: (termId: string) => void
+  onAskContext?: (text: string) => void
+  onEditContext?: (text: string) => void
 }
 
 function renderInline(nodes: RichText, onTermClick?: (termId: string) => void) {
@@ -177,9 +181,31 @@ function renderBlock(block: DocumentBlock, onTermClick?: (termId: string) => voi
   return null
 }
 
-export function DocumentViewer({ onTermClick }: DocumentViewerProps) {
+export function DocumentViewer({ onTermClick, onAskContext, onEditContext }: DocumentViewerProps) {
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; text: string } | null>(null)
+
+  useEffect(() => {
+    if (!contextMenu) return
+    function dismiss() { setContextMenu(null) }
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setContextMenu(null) }
+    document.addEventListener('click', dismiss)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('click', dismiss)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [!!contextMenu]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handleContextMenu(e: React.MouseEvent) {
+    const selection = window.getSelection()
+    const text = selection?.toString().trim() ?? ''
+    if (!text) return
+    e.preventDefault()
+    setContextMenu({ x: e.clientX, y: e.clientY, text })
+  }
+
   return (
-    <div className="w-full h-full overflow-y-auto bg-muted/30">
+    <div className="w-full h-full overflow-y-auto bg-muted/30" onContextMenu={handleContextMenu}>
       <div className="mx-3 my-3 px-12 py-8 bg-card shadow-sm">
         <div className="mb-6 flex items-center justify-between">
           <p className="text-xs text-muted-foreground">Ref: {mockDocument.ref}</p>
@@ -189,6 +215,31 @@ export function DocumentViewer({ onTermClick }: DocumentViewerProps) {
           <div key={i}>{renderBlock(block, onTermClick)}</div>
         ))}
       </div>
+
+      {contextMenu && (
+        <div
+          className="fixed z-50 min-w-[120px] overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-md py-1"
+          style={{ top: contextMenu.y + 4, left: contextMenu.x + 4 }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            className="flex w-full items-center gap-2.5 px-3 py-1.5 text-sm hover:bg-accent transition-colors"
+            onClick={() => { onAskContext?.(contextMenu.text); setContextMenu(null) }}
+          >
+            <MessageSquare className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            Ask
+          </button>
+          <div className="h-px bg-border mx-1" />
+          <button
+            className="flex w-full items-center gap-2.5 px-3 py-1.5 text-sm hover:bg-accent transition-colors"
+            onClick={() => { onEditContext?.(contextMenu.text); setContextMenu(null) }}
+          >
+            <Pencil className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            Edit
+          </button>
+        </div>
+      )}
     </div>
   )
 }

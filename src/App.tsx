@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { Sidebar } from '@/components/sidebar/Sidebar'
 import { ReviewSidebar } from '@/components/review/ReviewSidebar'
 import { DefinelySidebar } from '@/components/review/DefinelySidebar'
@@ -17,6 +17,15 @@ function App() {
   const [activeFlow, setActiveFlow] = useState(
     new URLSearchParams(window.location.search).get('flow') ?? 'action-space-b'
   )
+  const [contextChips, setContextChips] = useState<{ id: string; text: string }[]>([])
+
+  const handleAddContext = useCallback((text: string) => {
+    setContextChips((prev) => [...prev, { id: `ctx-${Date.now()}`, text }])
+  }, [])
+
+  const handleRemoveContextChip = useCallback((id: string) => {
+    setContextChips((prev) => prev.filter((c) => c.id !== id))
+  }, [])
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden">
@@ -80,9 +89,9 @@ function App() {
         {activeFlow === 'action-space-b' && (
           <>
             <main className="flex w-2/3 overflow-hidden">
-              <DocumentViewer onTermClick={() => {}} />
+              <DocumentViewer onTermClick={() => {}} onAskContext={handleAddContext} onEditContext={handleAddContext} />
             </main>
-            <ActionSpaceSidebarB />
+            <ActionSpaceSidebarB contextChips={contextChips} onRemoveContextChip={handleRemoveContextChip} />
           </>
         )}
       </div>
