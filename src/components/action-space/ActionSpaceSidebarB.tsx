@@ -422,7 +422,9 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip }: 
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([])
   const dragCounterRef = useRef<number>(0)
   const pendingFileRef = useRef<string>('')
-  const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[]>([])
+  const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[]>([
+    { id: 'saved-lol', label: 'Pull a limitation of liability clause for a SaaS agreement from Vault', prompt: 'Pull a limitation of liability clause for a SaaS agreement from Vault' },
+  ])
   const [uploadingFile, setUploadingFile] = useState('')
   const [promptOpen, setPromptOpen] = useState(false)
   const [appliedPrompt, setAppliedPrompt] = useState<{ text: string; v: number } | null>(null)
