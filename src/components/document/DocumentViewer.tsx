@@ -1,18 +1,47 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { MessageSquare, Pencil } from 'lucide-react'
 import type { RichText, SectionBlock, DocumentBlock, NumberedClause } from '@/data/mockDocument'
 import { mockDocument } from '@/data/mockDocument'
+import { cn } from '@/lib/utils'
+
+export interface InsertedEdit {
+  id: string
+  original: string
+  edited: string
+}
 
 interface DocumentViewerProps {
   onTermClick?: (termId: string) => void
   onAskContext?: (text: string) => void
   onEditContext?: (text: string) => void
   onSelectionChange?: (text: string) => void
+  insertedEdits?: InsertedEdit[]
+  goToEditId?: string | null
+  highlightedSectionId?: string | null
 }
 
-function renderInline(nodes: RichText, onTermClick?: (termId: string) => void) {
+function renderInline(nodes: RichText, onTermClick?: (termId: string) => void, insertedEdits?: InsertedEdit[]) {
   return nodes.map((node, i) => {
     if (node.type === 'text') {
+      if (insertedEdits) {
+        for (const edit of insertedEdits) {
+          const idx = node.text.indexOf(edit.original)
+          if (idx !== -1) {
+            return (
+              <span key={i}>
+                {idx > 0 && node.text.slice(0, idx)}
+                <mark
+                  id={`edit-${edit.id}`}
+                  className="bg-amber-100 not-italic rounded-sm"
+                >
+                  {edit.edited}
+                </mark>
+                {node.text.slice(idx + edit.original.length)}
+              </span>
+            )
+          }
+        }
+      }
       return <span key={i}>{node.text}</span>
     }
     return (
@@ -28,24 +57,24 @@ function renderInline(nodes: RichText, onTermClick?: (termId: string) => void) {
   })
 }
 
-function renderSubclauses(subclauses: NumberedClause[], onTermClick?: (termId: string) => void) {
+function renderSubclauses(subclauses: NumberedClause[], onTermClick?: (termId: string) => void, insertedEdits?: InsertedEdit[]) {
   return (
     <div className="pl-6 mt-1.5 space-y-1.5">
       {subclauses.map((sub) => (
         <div key={sub.number} className="flex gap-3 text-sm leading-relaxed">
           <span className="shrink-0 text-muted-foreground w-6">{sub.number}</span>
-          <span>{renderInline(sub.content, onTermClick)}</span>
+          <span>{renderInline(sub.content, onTermClick, insertedEdits)}</span>
         </div>
       ))}
     </div>
   )
 }
 
-function renderSectionBlock(block: SectionBlock, onTermClick?: (termId: string) => void) {
+function renderSectionBlock(block: SectionBlock, onTermClick?: (termId: string) => void, insertedEdits?: InsertedEdit[]) {
   if (block.type === 'paragraph') {
     return (
       <p className="mb-3 text-sm leading-relaxed text-foreground">
-        {renderInline(block.content, onTermClick)}
+        {renderInline(block.content, onTermClick, insertedEdits)}
       </p>
     )
   }
@@ -55,7 +84,7 @@ function renderSectionBlock(block: SectionBlock, onTermClick?: (termId: string) 
       <p className="mb-3 text-sm leading-relaxed">
         <span className="font-semibold">"{block.term}"</span>
         <span className="text-muted-foreground"> means </span>
-        <span>{renderInline(block.content, onTermClick)}</span>
+        <span>{renderInline(block.content, onTermClick, insertedEdits)}</span>
       </p>
     )
   }
@@ -65,9 +94,9 @@ function renderSectionBlock(block: SectionBlock, onTermClick?: (termId: string) 
       <div className="mb-3">
         <div className="flex gap-3 text-sm leading-relaxed">
           <span className="shrink-0 font-medium text-foreground w-8">{block.number}</span>
-          <span className="flex-1">{renderInline(block.content, onTermClick)}</span>
+          <span className="flex-1">{renderInline(block.content, onTermClick, insertedEdits)}</span>
         </div>
-        {block.subclauses && renderSubclauses(block.subclauses, onTermClick)}
+        {block.subclauses && renderSubclauses(block.subclauses, onTermClick, insertedEdits)}
       </div>
     )
   }
@@ -75,7 +104,7 @@ function renderSectionBlock(block: SectionBlock, onTermClick?: (termId: string) 
   return null
 }
 
-function renderBlock(block: DocumentBlock, onTermClick?: (termId: string) => void) {
+function renderBlock(block: DocumentBlock, onTermClick?: (termId: string) => void, insertedEdits?: InsertedEdit[], highlightedSectionId?: string | null) {
   if (block.type === 'title') {
     return (
       <div key="title" className="text-center mb-10">
@@ -125,7 +154,7 @@ function renderBlock(block: DocumentBlock, onTermClick?: (termId: string) => voi
             return (
               <div key={i} className="flex gap-3">
                 <span className="shrink-0 font-medium text-foreground">{letter}.</span>
-                <span>{renderInline(item, onTermClick)}</span>
+                <span>{renderInline(item, onTermClick, insertedEdits)}</span>
               </div>
             )
           })}
@@ -136,13 +165,20 @@ function renderBlock(block: DocumentBlock, onTermClick?: (termId: string) => voi
 
   if (block.type === 'section') {
     return (
-      <section key={block.id} id={block.id} className="mb-2">
+      <section
+        key={block.id}
+        id={block.id}
+        className={cn(
+          'mb-2 rounded-lg transition-colors duration-700',
+          highlightedSectionId === block.id && 'bg-amber-50'
+        )}
+      >
         <h2 className="text-xs font-semibold uppercase tracking-wide border-b border-border pb-2 mt-8 mb-4 text-foreground">
           {block.number}.{'  '}{block.title}
         </h2>
         <div>
           {block.blocks.map((b, i) => (
-            <div key={i}>{renderSectionBlock(b, onTermClick)}</div>
+            <div key={i}>{renderSectionBlock(b, onTermClick, insertedEdits)}</div>
           ))}
         </div>
       </section>
@@ -182,8 +218,9 @@ function renderBlock(block: DocumentBlock, onTermClick?: (termId: string) => voi
   return null
 }
 
-export function DocumentViewer({ onTermClick, onAskContext, onEditContext, onSelectionChange }: DocumentViewerProps) {
+export function DocumentViewer({ onTermClick, onAskContext, onEditContext, onSelectionChange, insertedEdits, goToEditId, highlightedSectionId }: DocumentViewerProps) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; text: string } | null>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     function handleSelectionChange() {
@@ -193,6 +230,20 @@ export function DocumentViewer({ onTermClick, onAskContext, onEditContext, onSel
     document.addEventListener('selectionchange', handleSelectionChange)
     return () => document.removeEventListener('selectionchange', handleSelectionChange)
   }, [onSelectionChange])
+
+  useEffect(() => {
+    if (!goToEditId) return
+    requestAnimationFrame(() => {
+      const container = scrollContainerRef.current
+      // Try the highlighted mark first, fall back to the section element by its id
+      const el = document.getElementById(`edit-${goToEditId}`) ?? document.getElementById(goToEditId)
+      if (!container || !el) return
+      const containerRect = container.getBoundingClientRect()
+      const elRect = el.getBoundingClientRect()
+      const targetScrollTop = container.scrollTop + (elRect.top - containerRect.top) - containerRect.height / 2 + elRect.height / 2
+      container.scrollTo({ top: targetScrollTop, behavior: 'smooth' })
+    })
+  }, [goToEditId])
 
   useEffect(() => {
     if (!contextMenu) return
@@ -215,14 +266,14 @@ export function DocumentViewer({ onTermClick, onAskContext, onEditContext, onSel
   }
 
   return (
-    <div className="w-full h-full overflow-y-auto bg-muted/30" onContextMenu={handleContextMenu}>
+    <div ref={scrollContainerRef} className="w-full h-full overflow-y-auto bg-muted/30" onContextMenu={handleContextMenu}>
       <div className="mx-3 my-3 px-12 py-8 bg-card shadow-sm">
         <div className="mb-6 flex items-center justify-between">
           <p className="text-xs text-muted-foreground">Ref: {mockDocument.ref}</p>
           <p className="text-xs text-muted-foreground">CONFIDENTIAL</p>
         </div>
         {mockDocument.blocks.map((block, i) => (
-          <div key={i}>{renderBlock(block, onTermClick)}</div>
+          <div key={i}>{renderBlock(block, onTermClick, insertedEdits, highlightedSectionId)}</div>
         ))}
       </div>
 

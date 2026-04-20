@@ -4,7 +4,7 @@ import { ReviewSidebar } from '@/components/review/ReviewSidebar'
 import { DefinelySidebar } from '@/components/review/DefinelySidebar'
 import { ActionSpaceSidebar } from '@/components/action-space/ActionSpaceSidebar'
 import { ActionSpaceSidebarB } from '@/components/action-space/ActionSpaceSidebarB'
-import { DocumentViewer } from '@/components/document/DocumentViewer'
+import { DocumentViewer, type InsertedEdit } from '@/components/document/DocumentViewer'
 import { WordShell } from '@/components/word-shell/WordShell'
 
 function App() {
@@ -13,6 +13,9 @@ function App() {
   )
   const [contextChips, setContextChips] = useState<{ id: string; text: string }[]>([])
   const [selectedText, setSelectedText] = useState('')
+  const [insertedEdits, setInsertedEdits] = useState<InsertedEdit[]>([])
+  const [goToEditId, setGoToEditId] = useState<string | null>(null)
+  const [highlightedSectionId, setHighlightedSectionId] = useState<string | null>(null)
 
   const handleAddContext = useCallback((text: string) => {
     setContextChips((prev) => [...prev, { id: `ctx-${Date.now()}`, text }])
@@ -20,6 +23,17 @@ function App() {
 
   const handleRemoveContextChip = useCallback((id: string) => {
     setContextChips((prev) => prev.filter((c) => c.id !== id))
+  }, [])
+
+  const handleInsertEditToDoc = useCallback((id: string, original: string, edited: string) => {
+    setInsertedEdits((prev) => [...prev, { id, original, edited }])
+  }, [])
+
+  const handleGoToEdit = useCallback((id: string) => {
+    setGoToEditId(null)
+    setTimeout(() => setGoToEditId(id), 10)
+    setHighlightedSectionId(id)
+    setTimeout(() => setHighlightedSectionId(null), 2500)
   }, [])
 
   return (
@@ -76,8 +90,19 @@ function App() {
             onAskContext={handleAddContext}
             onEditContext={handleAddContext}
             onSelectionChange={setSelectedText}
+            insertedEdits={insertedEdits}
+            goToEditId={goToEditId}
+            highlightedSectionId={highlightedSectionId}
             sidebar={
-              <ActionSpaceSidebarB contextChips={contextChips} onRemoveContextChip={handleRemoveContextChip} selectedText={selectedText} onAskContext={handleAddContext} onEditContext={handleAddContext} />
+              <ActionSpaceSidebarB
+                contextChips={contextChips}
+                onRemoveContextChip={handleRemoveContextChip}
+                selectedText={selectedText}
+                onAskContext={handleAddContext}
+                onEditContext={handleAddContext}
+                onInsertEditToDoc={handleInsertEditToDoc}
+                onGoToEdit={handleGoToEdit}
+              />
             }
           />
         )}

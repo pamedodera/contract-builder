@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, Fragment } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { cn } from '@/lib/utils'
-import { Plus, ChevronDown, ChevronUp, ChevronRight, ArrowRight, Check, Loader2, Undo2, FileText, Upload, FileUp, BookmarkPlus, Bookmark, MessageSquare, Pencil } from 'lucide-react'
+import { Plus, ChevronDown, ChevronUp, ChevronRight, ArrowRight, Check, Loader2, Undo2, FileText, Upload, FileUp, BookmarkPlus, Bookmark, Pencil, Quote } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -17,6 +17,8 @@ interface EditMessage {
   id: string
   type: 'user' | 'assistant'
   text: string
+  chips?: { id: string; text: string }[]
+  editedTexts?: { original: string; edited: string }[]
   editedText?: string
   inserted?: boolean
 }
@@ -401,15 +403,31 @@ function DefinitionGroupCard({
   )
 }
 
+type CardInsertPhase = 'idle' | 'queued' | 'running' | 'done'
+interface CardInsertState {
+  phase: CardInsertPhase
+  step?: 1 | 2 | 3
+  editId?: string
+  anchorId?: string
+}
+interface QueueEntry {
+  key: string
+  original: string
+  edited: string
+  anchorId?: string
+}
+
 interface ActionSpaceSidebarBProps {
   contextChips?: { id: string; text: string }[]
   onRemoveContextChip?: (id: string) => void
   selectedText?: string
   onAskContext?: (text: string) => void
   onEditContext?: (text: string) => void
+  onInsertEditToDoc?: (id: string, original: string, edited: string) => void
+  onGoToEdit?: (id: string) => void
 }
 
-export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, selectedText = '', onAskContext, onEditContext }: ActionSpaceSidebarBProps) {
+export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, selectedText = '', onAskContext, onEditContext, onInsertEditToDoc, onGoToEdit }: ActionSpaceSidebarBProps) {
   const [activeTab, setActiveTab] = useState<Tab>('enhance')
   const [view, setView] = useState<View>('main')
   const [mode, setMode] = useState<Mode>('chat')
@@ -456,15 +474,38 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, se
   }
 
   function handleEditButtonClick() {
+    // Capture the document section containing the current selection for reliable "Go to edit" scrolling
+    editAnchorRef.current = undefined
+    const selection = window.getSelection()
+    if (selection && selection.rangeCount > 0) {
+      let node: Node | null = selection.getRangeAt(0).startContainer
+      while (node && node !== document.documentElement) {
+        if (node instanceof Element && node.tagName === 'SECTION' && node.id) {
+          editAnchorRef.current = node.id
+          break
+        }
+        node = node.parentNode
+      }
+    }
     setEditingText(selectedText)
     setEditMessages([])
     setEditPhase('idle')
+    setEditChipDismissed(false)
+    setEditExtraChips([])
+    // If the chip was already visible in chat, don't animate it again in edit space
+    setEditChipAlreadySeen(selectedText !== '' && !selectionChipDismissed)
     setMode('text-edit')
   }
 
   function handleEditSend(prompt: string) {
-    const userMsg: EditMessage = { id: `edit-${Date.now()}`, type: 'user', text: prompt }
+    const activeChips = [
+      ...(editChipDismissed ? [] : [{ id: 'edit-selection', text: editingText }]),
+      ...editExtraChips,
+    ]
+    const userMsg: EditMessage = { id: `edit-${Date.now()}`, type: 'user', text: prompt, chips: activeChips }
     setEditMessages(prev => [...prev, userMsg])
+    setEditChipDismissed(true)
+    setEditExtraChips([])
     setEditPhase('loading')
     scrollEditToBottom()
     setTimeout(() => {
@@ -472,7 +513,7 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, se
         id: `edit-${Date.now()}-ai`,
         type: 'assistant',
         text: prompt,
-        editedText: generateMockEdit(editingText),
+        editedTexts: activeChips.map(c => ({ original: c.text, edited: generateMockEdit(c.text) })),
       }
       setEditMessages(prev => [...prev, aiMsg])
       setEditPhase('idle')
@@ -480,8 +521,37 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, se
     }, 1400)
   }
 
-  function handleInsertEdit(msgId: string) {
-    setEditMessages(prev => prev.map(m => m.id === msgId ? { ...m, inserted: true } : m))
+  function startCardInsert(key: string, original: string, edited: string, anchorId?: string) {
+    activeInsertKeyRef.current = key
+    setCardInserts(prev => ({ ...prev, [key]: { phase: 'running', step: 1 } }))
+    setTimeout(() => {
+      setCardInserts(prev => ({ ...prev, [key]: { phase: 'running', step: 2 } }))
+      setTimeout(() => {
+        setCardInserts(prev => ({ ...prev, [key]: { phase: 'running', step: 3 } }))
+        setTimeout(() => {
+          const editId = `doc-edit-${Date.now()}`
+          onInsertEditToDoc?.(editId, original, edited)
+          setCardInserts(prev => ({ ...prev, [key]: { phase: 'done', editId, anchorId } }))
+          activeInsertKeyRef.current = null
+          const next = insertQueueRef.current.shift()
+          if (next) startCardInsert(next.key, next.original, next.edited, next.anchorId)
+        }, 700)
+      }, 700)
+    }, 700)
+  }
+
+  function handleInsertEdit(msgId: string, cardIndex: number) {
+    const key = `${msgId}:${cardIndex}`
+    const msg = editMessages.find(m => m.id === msgId)
+    const et = msg?.editedTexts?.[cardIndex]
+    if (!et) return
+    const anchorId = editAnchorRef.current
+    if (activeInsertKeyRef.current !== null) {
+      setCardInserts(prev => ({ ...prev, [key]: { phase: 'queued' } }))
+      insertQueueRef.current.push({ key, original: et.original, edited: et.edited, anchorId })
+    } else {
+      startCardInsert(key, et.original, et.edited, anchorId)
+    }
   }
 
   const [showConfirmation, setShowConfirmation] = useState(true)
@@ -500,9 +570,34 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, se
   const [editMessages, setEditMessages] = useState<EditMessage[]>([])
   const [editPhase, setEditPhase] = useState<'idle' | 'loading'>('idle')
   const editScrollRef = useRef<HTMLDivElement>(null)
+  const [selectionChipDismissed, setSelectionChipDismissed] = useState(false)
+  const [editChipDismissed, setEditChipDismissed] = useState(false)
+  const [editChipAlreadySeen, setEditChipAlreadySeen] = useState(false)
+  const [editExtraChips, setEditExtraChips] = useState<{ id: string; text: string }[]>([])
+  const prevContextChipsRef = useRef(contextChips)
+  const [cardInserts, setCardInserts] = useState<Record<string, CardInsertState>>({})
+  const activeInsertKeyRef = useRef<string | null>(null)
+  const insertQueueRef = useRef<QueueEntry[]>([])
+  const editAnchorRef = useRef<string | undefined>(undefined)
 
   const allChecked = definitions.every((d) => checked[d.id])
   const checkedCount = definitions.filter((d) => checked[d.id]).length
+
+  // Reset selection chip dismissed state whenever a new text is selected
+  useEffect(() => {
+    if (selectedText) setSelectionChipDismissed(false)
+  }, [selectedText])
+
+  // Intercept new context chips added while in text-edit mode → route them to edit space instead
+  useEffect(() => {
+    const prev = prevContextChipsRef.current
+    const newChips = contextChips.filter((c) => !prev.find((p) => p.id === c.id))
+    prevContextChipsRef.current = contextChips
+    if (mode === 'text-edit' && newChips.length > 0) {
+      setEditExtraChips((existing) => [...existing, ...newChips])
+      newChips.forEach((c) => onRemoveContextChip?.(c.id))
+    }
+  }, [contextChips]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Phase 1: animate steps 1–3 on initial send
   useEffect(() => {
@@ -946,9 +1041,11 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, se
               {sep}
               <span className="text-sm font-medium text-foreground">Edit Space</span>
             </div>
-            <Button variant="secondary" size="xs" onClick={() => setShowRedline((v) => !v)} className="shrink-0">
-              {showRedline ? 'Hide redline' : 'Show redline'}
-            </Button>
+            {agentStep >= 6 && (
+              <Button variant="secondary" size="xs" onClick={() => setShowRedline((v) => !v)} className="shrink-0">
+                {showRedline ? 'Hide redline' : 'Show redline'}
+              </Button>
+            )}
           </div>
         ) : (
           <div className="shrink-0 border-b border-border px-3 py-2 flex items-center gap-1 bg-background">
@@ -1145,14 +1242,6 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, se
                 <div className="flex gap-2 px-3 py-2 border-b border-border">
                   <button
                     type="button"
-                    onClick={() => onAskContext?.(selectedText)}
-                    className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-                  >
-                    <MessageSquare className="h-3.5 w-3.5 shrink-0" />
-                    Ask
-                  </button>
-                  <button
-                    type="button"
                     onClick={handleEditButtonClick}
                     className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
                   >
@@ -1162,7 +1251,25 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, se
                 </div>
               )}
               <div className="px-3 pb-3 pt-3">
-                <ChatInput onSend={(text) => { setSelectedActionLabel(text); setChatPhase('confirming'); setShowConfirmation(true) }} placeholder="Ask Enhance" rows={2} inputRef={chatInputRef} attachedFiles={uploadedFiles} onRemoveFile={(i) => setUploadedFiles((prev) => prev.filter((_, idx) => idx !== i))} promptToApply={appliedPrompt} uploadingFile={uploadingFile} isDragActive={dragState === 'dragging'} contextChips={contextChips} onRemoveContextChip={onRemoveContextChip} />
+                <ChatInput
+                  onSend={(text) => { setSelectedActionLabel(text); setChatPhase('confirming'); setShowConfirmation(true) }}
+                  placeholder="Ask Enhance"
+                  rows={2}
+                  inputRef={chatInputRef}
+                  attachedFiles={uploadedFiles}
+                  onRemoveFile={(i) => setUploadedFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                  promptToApply={appliedPrompt}
+                  uploadingFile={uploadingFile}
+                  isDragActive={dragState === 'dragging'}
+                  contextChips={[
+                    ...contextChips,
+                    ...(selectedText && !selectionChipDismissed ? [{ id: 'sel-text', text: selectedText }] : []),
+                  ]}
+                  onRemoveContextChip={(id) => {
+                    if (id === 'sel-text') setSelectionChipDismissed(true)
+                    else onRemoveContextChip?.(id)
+                  }}
+                />
               </div>
             </div>
           </div>
@@ -1327,53 +1434,77 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, se
         {/* ── Text Edit mode ── */}
         {mode === 'text-edit' && (
           <>
-            {/* Breadcrumb */}
-            <div className="shrink-0 border-b border-border px-3 py-2 flex items-center gap-1 bg-background">
-              <button
-                onClick={() => setMode('chat')}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Chat
-              </button>
-              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-              <span className="text-sm font-medium text-foreground">Edit text</span>
-            </div>
-
             {/* Scroll area */}
             <div ref={editScrollRef} className="flex-1 overflow-y-auto min-h-0 px-3 py-3 flex flex-col gap-3">
-
-              {/* Context tile — the highlighted text */}
-              <div className="rounded-lg border border-border bg-muted/40 px-3 py-2.5 flex flex-col gap-1">
-                <p className="text-xs font-medium text-muted-foreground">Selected text</p>
-                <p className="text-sm text-foreground line-clamp-4 leading-relaxed">{editingText}</p>
-              </div>
 
               {/* Conversation */}
               {editMessages.map((msg) => (
                 msg.type === 'user' ? (
                   <div key={msg.id} className="flex justify-end">
-                    <div className="max-w-[85%] rounded-xl rounded-tr-sm bg-[#B8C1DE] text-foreground px-3 py-2 text-sm leading-relaxed">
-                      {msg.text}
+                    <div className="w-full rounded-xl rounded-tr-sm bg-[#B8C1DE] text-foreground px-3 py-2 text-sm leading-relaxed flex flex-col gap-2">
+                      <span>{msg.text}</span>
+                      {msg.chips && msg.chips.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {msg.chips.map((c) => (
+                            <div key={c.id} className="inline-flex items-center gap-1.5 rounded-md border border-border/40 bg-white/30 px-2 py-1 text-xs text-foreground max-w-full">
+                              <Quote className="h-3.5 w-3.5 shrink-0 opacity-70" />
+                              <span className="truncate">{c.text}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ) : (
                   <div key={msg.id} className="flex flex-col gap-2">
-                    <div className="rounded-xl border border-border bg-background px-3 py-3 flex flex-col gap-3">
-                      <p className="text-xs font-medium text-muted-foreground">Suggested edit</p>
-                      <div className="flex flex-col gap-1.5">
-                        <p className="text-sm text-muted-foreground line-through leading-relaxed">{editingText}</p>
-                        <p className="text-sm text-foreground leading-relaxed">{msg.editedText}</p>
-                      </div>
-                      {msg.inserted ? (
-                        <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                          <Check className="h-3 w-3" /> Inserted
-                        </p>
-                      ) : (
-                        <div className="flex gap-2">
-                          <Button size="sm" onClick={() => handleInsertEdit(msg.id)}>Insert edit</Button>
+                    {msg.editedTexts?.map((et, i) => {
+                      const cardKey = `${msg.id}:${i}`
+                      const cardState = cardInserts[cardKey] ?? { phase: 'idle' }
+                      return (
+                        <div key={i} className="rounded-xl border border-border bg-background px-3 py-3 flex flex-col gap-3">
+                          <p className="text-xs font-medium text-muted-foreground">Suggested edit</p>
+                          {/* Content */}
+                          <div className="flex flex-col gap-1.5">
+                            <p className="text-sm text-muted-foreground line-through leading-relaxed">{et.original}</p>
+                            <p className="text-sm text-foreground leading-relaxed">{et.edited}</p>
+                          </div>
+                          {/* Divider */}
+                          <div className="h-px bg-border -mx-3" />
+                          {/* Actions / state */}
+                          {cardState.phase === 'idle' && (
+                            <div className="flex gap-2">
+                              <Button size="sm" onClick={() => handleInsertEdit(msg.id, i)}>Insert edit</Button>
+                            </div>
+                          )}
+                          {cardState.phase === 'queued' && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                              <Loader2 className="h-3 w-3 animate-spin shrink-0" />
+                              Waiting in queue…
+                            </p>
+                          )}
+                          {cardState.phase === 'running' && (
+                            <div className="flex flex-col">
+                              <TimelineStep status={cardState.step === 1 ? 'loading' : 'done'} label="Locating text" description="Searching the document for the selected passage…" showConnector={true} />
+                              <TimelineStep status={cardState.step === 1 ? 'waiting' : cardState.step === 2 ? 'loading' : 'done'} label="Applying edit" description="Replacing with your suggested revision…" showConnector={true} />
+                              <TimelineStep status={(cardState.step ?? 0) < 3 ? 'waiting' : 'loading'} label="Finalising" description="Saving changes to the document…" showConnector={false} />
+                            </div>
+                          )}
+                          {cardState.phase === 'done' && (
+                            <div className="flex items-center justify-between">
+                              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                                <Check className="h-3 w-3 text-green-600" /> Inserted
+                              </p>
+                              <Button variant="ghost" size="sm" onClick={() => {
+                                const target = cardState.anchorId ?? cardState.editId
+                                if (target) onGoToEdit?.(target)
+                              }}>
+                                Go to edit
+                              </Button>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
+                      )
+                    })}
                   </div>
                 )
               ))}
@@ -1393,8 +1524,14 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, se
                 onSend={handleEditSend}
                 placeholder="Describe the edit…"
                 rows={2}
-                contextChips={[{ id: 'edit-selection', text: editingText }]}
-                onRemoveContextChip={() => {}}
+                contextChips={[
+                  ...(editChipDismissed ? [] : [{ id: 'edit-selection', text: editingText, skipAnimation: editChipAlreadySeen }]),
+                  ...editExtraChips,
+                ]}
+                onRemoveContextChip={(id) => {
+                  if (id === 'edit-selection') setEditChipDismissed(true)
+                  else setEditExtraChips((prev) => prev.filter((c) => c.id !== id))
+                }}
               />
             </div>
           </>

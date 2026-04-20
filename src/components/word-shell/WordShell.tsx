@@ -1,4 +1,4 @@
-import { DocumentViewer } from '@/components/document/DocumentViewer'
+import { DocumentViewer, type InsertedEdit } from '@/components/document/DocumentViewer'
 
 // Figma asset URLs (valid for 7 days from design export)
 const imgBottomBar = 'https://www.figma.com/api/mcp/asset/ddfd518c-2dbb-42bb-b866-92f61e06236e'
@@ -72,9 +72,12 @@ interface WordShellProps {
   onAskContext?: (text: string) => void
   onEditContext?: (text: string) => void
   onSelectionChange?: (text: string) => void
+  insertedEdits?: InsertedEdit[]
+  goToEditId?: string | null
+  highlightedSectionId?: string | null
 }
 
-export function WordShell({ sidebar, onAskContext, onEditContext, onSelectionChange }: WordShellProps) {
+export function WordShell({ sidebar, onAskContext, onEditContext, onSelectionChange, insertedEdits, goToEditId, highlightedSectionId }: WordShellProps) {
   return (
     <div className="flex flex-col flex-1 overflow-hidden" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
 
@@ -477,6 +480,9 @@ export function WordShell({ sidebar, onAskContext, onEditContext, onSelectionCha
               onAskContext={onAskContext}
               onEditContext={onEditContext}
               onSelectionChange={onSelectionChange}
+              insertedEdits={insertedEdits}
+              goToEditId={goToEditId}
+              highlightedSectionId={highlightedSectionId}
             />
           </div>
         </div>

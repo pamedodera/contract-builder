@@ -10,18 +10,23 @@ export type SavedPrompt = { id: string; label: string; prompt: string }
 function ContextChip({
   text,
   index,
+  skipAnimation,
   onRemove,
 }: {
   text: string
   index: number
+  skipAnimation?: boolean
   onRemove: () => void
 }) {
+  const entryProps = skipAnimation
+    ? {}
+    : { initial: { opacity: 0, scale: 0.85, y: 4 } }
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.85, y: 4 }}
+      {...entryProps}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.85, y: 4 }}
-      transition={{ type: 'spring', bounce: 0.35, delay: 0.05 + index * 0.06 }}
+      transition={{ type: 'spring', bounce: 0.35, delay: skipAnimation ? 0 : 0.05 + index * 0.06 }}
       className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 shrink-0 max-w-[240px]"
     >
       <Quote className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -102,7 +107,7 @@ interface ChatInputProps {
   promptToApply?: { text: string; v: number } | null
   uploadingFile?: string
   isDragActive?: boolean
-  contextChips?: { id: string; text: string }[]
+  contextChips?: { id: string; text: string; skipAnimation?: boolean }[]
   onRemoveContextChip?: (id: string) => void
 }
 
@@ -285,6 +290,7 @@ export function ChatInput({ onSend, placeholder = 'Ask the AI assistant…', row
                         key={chip.id}
                         text={chip.text}
                         index={i}
+                        skipAnimation={chip.skipAnimation}
                         onRemove={() => onRemoveContextChip?.(chip.id)}
                       />
                     ))}
