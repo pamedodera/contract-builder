@@ -11,7 +11,15 @@ import { ClauseCardFlat } from './ClauseCardFlat'
 
 type Tab = 'vault' | 'draft' | 'proof' | 'cascade' | 'enhance'
 type View = 'main' | 'definitions'
-type Mode = 'edit' | 'chat'
+type Mode = 'edit' | 'chat' | 'text-edit'
+
+interface EditMessage {
+  id: string
+  type: 'user' | 'assistant'
+  text: string
+  editedText?: string
+  inserted?: boolean
+}
 type ChatPhase = 'idle' | 'confirming' | 'processing'
 type StepStatus = 'loading' | 'done' | 'waiting'
 type InsertStatus = 'pending' | 'inserting' | 'inserted' | 'undone' | 'cancelled'
@@ -430,6 +438,52 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, se
     })
   }
 
+  function scrollEditToBottom() {
+    requestAnimationFrame(() => {
+      if (editScrollRef.current) {
+        editScrollRef.current.scrollTop = editScrollRef.current.scrollHeight
+      }
+    })
+  }
+
+  function generateMockEdit(original: string): string {
+    return original
+      .replace(/\bshall\b/g, 'must')
+      .replace(/\bimmediately\b/g, 'promptly')
+      .replace(/\bin accordance with\b/g, 'under')
+      .replace(/\bpursuant to\b/g, 'under')
+      .replace(/\bnotwithstanding\b/g, 'despite')
+  }
+
+  function handleEditButtonClick() {
+    setEditingText(selectedText)
+    setEditMessages([])
+    setEditPhase('idle')
+    setMode('text-edit')
+  }
+
+  function handleEditSend(prompt: string) {
+    const userMsg: EditMessage = { id: `edit-${Date.now()}`, type: 'user', text: prompt }
+    setEditMessages(prev => [...prev, userMsg])
+    setEditPhase('loading')
+    scrollEditToBottom()
+    setTimeout(() => {
+      const aiMsg: EditMessage = {
+        id: `edit-${Date.now()}-ai`,
+        type: 'assistant',
+        text: prompt,
+        editedText: generateMockEdit(editingText),
+      }
+      setEditMessages(prev => [...prev, aiMsg])
+      setEditPhase('idle')
+      scrollEditToBottom()
+    }, 1400)
+  }
+
+  function handleInsertEdit(msgId: string) {
+    setEditMessages(prev => prev.map(m => m.id === msgId ? { ...m, inserted: true } : m))
+  }
+
   const [showConfirmation, setShowConfirmation] = useState(true)
   const [dragState, setDragState] = useState<DragState>('idle')
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([])
@@ -442,6 +496,10 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, se
   const [promptOpen, setPromptOpen] = useState(false)
   const [appliedPrompt, setAppliedPrompt] = useState<{ text: string; v: number } | null>(null)
   const [selectedActionLabel, setSelectedActionLabel] = useState<string | null>(null)
+  const [editingText, setEditingText] = useState('')
+  const [editMessages, setEditMessages] = useState<EditMessage[]>([])
+  const [editPhase, setEditPhase] = useState<'idle' | 'loading'>('idle')
+  const editScrollRef = useRef<HTMLDivElement>(null)
 
   const allChecked = definitions.every((d) => checked[d.id])
   const checkedCount = definitions.filter((d) => checked[d.id]).length
@@ -1095,7 +1153,7 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, se
                   </button>
                   <button
                     type="button"
-                    onClick={() => onEditContext?.(selectedText)}
+                    onClick={handleEditButtonClick}
                     className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
                   >
                     <Pencil className="h-3.5 w-3.5 shrink-0" />
@@ -1264,6 +1322,82 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, se
               {tabs.find((t) => t.id === activeTab)?.label} — coming soon
             </p>
           </div>
+        )}
+
+        {/* ── Text Edit mode ── */}
+        {mode === 'text-edit' && (
+          <>
+            {/* Breadcrumb */}
+            <div className="shrink-0 border-b border-border px-3 py-2 flex items-center gap-1 bg-background">
+              <button
+                onClick={() => setMode('chat')}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Chat
+              </button>
+              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <span className="text-sm font-medium text-foreground">Edit text</span>
+            </div>
+
+            {/* Scroll area */}
+            <div ref={editScrollRef} className="flex-1 overflow-y-auto min-h-0 px-3 py-3 flex flex-col gap-3">
+
+              {/* Context tile — the highlighted text */}
+              <div className="rounded-lg border border-border bg-muted/40 px-3 py-2.5 flex flex-col gap-1">
+                <p className="text-xs font-medium text-muted-foreground">Selected text</p>
+                <p className="text-sm text-foreground line-clamp-4 leading-relaxed">{editingText}</p>
+              </div>
+
+              {/* Conversation */}
+              {editMessages.map((msg) => (
+                msg.type === 'user' ? (
+                  <div key={msg.id} className="flex justify-end">
+                    <div className="max-w-[85%] rounded-xl rounded-tr-sm bg-[#B8C1DE] text-foreground px-3 py-2 text-sm leading-relaxed">
+                      {msg.text}
+                    </div>
+                  </div>
+                ) : (
+                  <div key={msg.id} className="flex flex-col gap-2">
+                    <div className="rounded-xl border border-border bg-background px-3 py-3 flex flex-col gap-3">
+                      <p className="text-xs font-medium text-muted-foreground">Suggested edit</p>
+                      <div className="flex flex-col gap-1.5">
+                        <p className="text-sm text-muted-foreground line-through leading-relaxed">{editingText}</p>
+                        <p className="text-sm text-foreground leading-relaxed">{msg.editedText}</p>
+                      </div>
+                      {msg.inserted ? (
+                        <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                          <Check className="h-3 w-3" /> Inserted
+                        </p>
+                      ) : (
+                        <div className="flex gap-2">
+                          <Button size="sm" onClick={() => handleInsertEdit(msg.id)}>Insert edit</Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              ))}
+
+              {/* Loading */}
+              {editPhase === 'loading' && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground px-1">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
+                  Editing…
+                </div>
+              )}
+            </div>
+
+            {/* Sticky footer */}
+            <div className="shrink-0 border-t border-border bg-background px-3 py-3">
+              <ChatInput
+                onSend={handleEditSend}
+                placeholder="Describe the edit…"
+                rows={2}
+                contextChips={[{ id: 'edit-selection', text: editingText }]}
+                onRemoveContextChip={() => {}}
+              />
+            </div>
+          </>
         )}
 
       </div>
