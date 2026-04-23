@@ -1,43 +1,43 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { Sidebar } from '@/components/sidebar/Sidebar'
 import { ReviewSidebar } from '@/components/review/ReviewSidebar'
 import { DefinelySidebar } from '@/components/review/DefinelySidebar'
 import { ActionSpaceSidebar } from '@/components/action-space/ActionSpaceSidebar'
 import { ActionSpaceSidebarB } from '@/components/action-space/ActionSpaceSidebarB'
-import { DocumentViewer } from '@/components/document/DocumentViewer'
-import { cn } from '@/lib/utils'
-
-const flows = [
-  { id: 'definely-brand', label: 'Future Proposals' },
-  { id: 'action-space', label: 'Actions Flow' },
-  { id: 'action-space-b', label: 'Actions Flow - Option B' },
-]
+import { DocumentViewer, type InsertedEdit } from '@/components/document/DocumentViewer'
+import { WordShell } from '@/components/word-shell/WordShell'
 
 function App() {
-  const [activeFlow, setActiveFlow] = useState(
-    new URLSearchParams(window.location.search).get('flow') ?? 'action-space-b'
+  const [activeFlow] = useState(
+    new URLSearchParams(window.location.search).get('flow') ?? 'word-shell'
   )
+  const [contextChips, setContextChips] = useState<{ id: string; text: string }[]>([])
+  const [selectedText, setSelectedText] = useState('')
+  const [insertedEdits, setInsertedEdits] = useState<InsertedEdit[]>([])
+  const [goToEditId, setGoToEditId] = useState<string | null>(null)
+  const [highlightedSectionId, setHighlightedSectionId] = useState<string | null>(null)
+
+  const handleAddContext = useCallback((text: string) => {
+    setContextChips((prev) => [...prev, { id: `ctx-${Date.now()}`, text }])
+  }, [])
+
+  const handleRemoveContextChip = useCallback((id: string) => {
+    setContextChips((prev) => prev.filter((c) => c.id !== id))
+  }, [])
+
+  const handleInsertEditToDoc = useCallback((id: string, original: string, edited: string, comment?: string) => {
+    setInsertedEdits((prev) => [...prev, { id, original, edited, comment }])
+  }, [])
+
+  const handleGoToEdit = useCallback((id: string) => {
+    setGoToEditId(null)
+    setTimeout(() => setGoToEditId(id), 10)
+    setHighlightedSectionId(id)
+    setTimeout(() => setHighlightedSectionId(null), 2500)
+  }, [])
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden">
-
-      {/* ── Top nav ── */}
-      <nav className="shrink-0 flex items-center gap-1 border-b border-border bg-background px-4 h-12">
-        {flows.map((flow) => (
-          <button
-            key={flow.id}
-            onClick={() => setActiveFlow(flow.id)}
-            className={cn(
-              'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-              activeFlow === flow.id
-                ? 'bg-accent text-accent-foreground'
-                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-            )}
-          >
-            {flow.label}
-          </button>
-        ))}
-      </nav>
 
       {/* ── Flow content ── */}
       <div className="flex flex-1 overflow-hidden">
@@ -80,10 +80,31 @@ function App() {
         {activeFlow === 'action-space-b' && (
           <>
             <main className="flex w-2/3 overflow-hidden">
-              <DocumentViewer onTermClick={() => {}} />
+              <DocumentViewer onTermClick={() => {}} onAskContext={handleAddContext} onEditContext={handleAddContext} onSelectionChange={setSelectedText} />
             </main>
-            <ActionSpaceSidebarB />
+            <ActionSpaceSidebarB contextChips={contextChips} onRemoveContextChip={handleRemoveContextChip} selectedText={selectedText} onAskContext={handleAddContext} onEditContext={handleAddContext} />
           </>
+        )}
+        {activeFlow === 'word-shell' && (
+          <WordShell
+            onAskContext={handleAddContext}
+            onEditContext={handleAddContext}
+            onSelectionChange={setSelectedText}
+            insertedEdits={insertedEdits}
+            goToEditId={goToEditId}
+            highlightedSectionId={highlightedSectionId}
+            sidebar={
+              <ActionSpaceSidebarB
+                contextChips={contextChips}
+                onRemoveContextChip={handleRemoveContextChip}
+                selectedText={selectedText}
+                onAskContext={handleAddContext}
+                onEditContext={handleAddContext}
+                onInsertEditToDoc={handleInsertEditToDoc}
+                onGoToEdit={handleGoToEdit}
+              />
+            }
+          />
         )}
       </div>
 

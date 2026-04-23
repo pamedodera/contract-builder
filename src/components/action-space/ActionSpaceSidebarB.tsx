@@ -1,17 +1,29 @@
 import { useState, useEffect, useRef, Fragment } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { cn } from '@/lib/utils'
-import { Plus, ChevronDown, ChevronUp, ChevronRight, ArrowRight, Check, Loader2, Undo2, FileText, Upload, FileUp, BookmarkPlus, Bookmark } from 'lucide-react'
+import { Plus, ChevronDown, ChevronUp, ChevronRight, ArrowRight, Check, Loader2, Undo2, FileText, Upload, FileUp, BookmarkPlus, Bookmark, Pencil, Quote } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ChatInput, type SavedPrompt } from '@/components/sidebar/ChatInput'
 import { ClauseCardFlat } from './ClauseCardFlat'
+import { ExpandableCallout } from '@/components/ui/expandable-callout'
+import { InsertButton } from '@/components/ui/insert-button'
 
 type Tab = 'vault' | 'draft' | 'proof' | 'cascade' | 'enhance'
 type View = 'main' | 'definitions'
-type Mode = 'edit' | 'chat'
+type Mode = 'edit' | 'chat' | 'text-edit'
+
+interface EditMessage {
+  id: string
+  type: 'user' | 'assistant'
+  text: string
+  chips?: { id: string; text: string }[]
+  editedTexts?: { original: string; edited: string; reasoning: string }[]
+  editedText?: string
+  inserted?: boolean
+}
 type ChatPhase = 'idle' | 'confirming' | 'processing'
 type StepStatus = 'loading' | 'done' | 'waiting'
 type InsertStatus = 'pending' | 'inserting' | 'inserted' | 'undone' | 'cancelled'
@@ -73,6 +85,12 @@ const definitionLocations: Record<string, string> = {
   'remediation': "Definitions · after 'Related Fund'",
   'force-majeure': "Definitions · after 'Finance Documents'",
 }
+
+const predefinedActions = [
+  { id: 'analyse', label: 'Analyse this document against Vault precedents', prompt: 'Analyse this document against Vault precedents' },
+  { id: 'insert', label: 'Insert a clause with its associated undefined terms', prompt: 'Insert a clause with its associated undefined terms' },
+  { id: 'compare', label: 'Compare document against standard position', prompt: 'Compare document against standard position' },
+]
 
 const saasAgreements = [
   'Salesforce Order Form – MSA 2023',
@@ -387,7 +405,32 @@ function DefinitionGroupCard({
   )
 }
 
-export function ActionSpaceSidebarB() {
+type CardInsertPhase = 'idle' | 'queued' | 'running' | 'done'
+interface CardInsertState {
+  phase: CardInsertPhase
+  step?: 1 | 2 | 3
+  editId?: string
+  anchorId?: string
+}
+interface QueueEntry {
+  key: string
+  original: string
+  edited: string
+  anchorId?: string
+  comment?: string
+}
+
+interface ActionSpaceSidebarBProps {
+  contextChips?: { id: string; text: string }[]
+  onRemoveContextChip?: (id: string) => void
+  selectedText?: string
+  onAskContext?: (text: string) => void
+  onEditContext?: (text: string) => void
+  onInsertEditToDoc?: (id: string, original: string, edited: string, comment?: string) => void
+  onGoToEdit?: (id: string) => void
+}
+
+export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, selectedText = '', onInsertEditToDoc, onGoToEdit }: ActionSpaceSidebarBProps) {
   const [activeTab, setActiveTab] = useState<Tab>('enhance')
   const [view, setView] = useState<View>('main')
   const [mode, setMode] = useState<Mode>('chat')
@@ -395,8 +438,8 @@ export function ActionSpaceSidebarB() {
   const [agentStep, setAgentStep] = useState(0)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [hasVisitedEditSpace, setHasVisitedEditSpace] = useState(false)
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [reasonExpanded, setReasonExpanded] = useState(false)
+
+
   const [showRedline, setShowRedline] = useState(true)
   const [checked, setChecked] = useState<Record<string, boolean>>(
     Object.fromEntries(definitions.map((d) => [d.id, true]))
@@ -406,16 +449,171 @@ export function ActionSpaceSidebarB() {
   const [insertStep, setInsertStep] = useState(-1)
   const insertBatchRef = useRef<InsertBatch | null>(null)
   const chatInputRef = useRef<HTMLTextAreaElement>(null)
+  const chatScrollRef = useRef<HTMLDivElement>(null)
+
+  function scrollChatToBottom() {
+    requestAnimationFrame(() => {
+      if (chatScrollRef.current) {
+        chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight
+      }
+    })
+  }
+
+  function scrollEditToBottom() {
+    requestAnimationFrame(() => {
+      if (editScrollRef.current) {
+        editScrollRef.current.scrollTop = editScrollRef.current.scrollHeight
+      }
+    })
+  }
+
+  function generateMockEdit(original: string): string {
+    return original
+      .replace(/\bshall\b/g, 'must')
+      .replace(/\bimmediately\b/g, 'promptly')
+      .replace(/\bin accordance with\b/g, 'under')
+      .replace(/\bpursuant to\b/g, 'under')
+      .replace(/\bnotwithstanding\b/g, 'despite')
+  }
+
+  function generateMockReasoning(original: string): string {
+    const changes: string[] = []
+    if (/\bshall\b/.test(original)) changes.push('"shall" replaced with "must" to align with plain English drafting standards and remove ambiguity about obligation')
+    if (/\bimmediately\b/.test(original)) changes.push('"immediately" replaced with "promptly" to avoid an unworkable absolute standard — "promptly" implies reasonable speed without implying instantaneous action')
+    if (/\bin accordance with\b/.test(original) || /\bpursuant to\b/.test(original)) changes.push('verbose cross-reference language simplified to "under" for concision')
+    if (/\bnotwithstanding\b/.test(original)) changes.push('"notwithstanding" replaced with "despite" to improve readability without changing legal meaning')
+    if (changes.length === 0) changes.push('clause rephrased to improve clarity and reduce ambiguity while preserving the original legal intent')
+    return changes.join('; ') + '.'
+  }
+
+  function handleEditButtonClick() {
+    // Capture the document section containing the current selection for reliable "Go to edit" scrolling
+    editAnchorRef.current = undefined
+    const selection = window.getSelection()
+    if (selection && selection.rangeCount > 0) {
+      let node: Node | null = selection.getRangeAt(0).startContainer
+      while (node && node !== document.documentElement) {
+        if (node instanceof Element && node.tagName === 'SECTION' && node.id) {
+          editAnchorRef.current = node.id
+          break
+        }
+        node = node.parentNode
+      }
+    }
+    setEditingText(selectedText)
+    setEditMessages([])
+    setEditPhase('idle')
+    setEditChipDismissed(false)
+    setEditExtraChips([])
+    // If the chip was already visible in chat, don't animate it again in edit space
+    setEditChipAlreadySeen(selectedText !== '' && !selectionChipDismissed)
+    setMode('text-edit')
+  }
+
+  function handleEditSend(prompt: string) {
+    const activeChips = [
+      ...(editChipDismissed ? [] : [{ id: 'edit-selection', text: editingText }]),
+      ...editExtraChips,
+    ]
+    const userMsg: EditMessage = { id: `edit-${Date.now()}`, type: 'user', text: prompt, chips: activeChips }
+    setEditMessages(prev => [...prev, userMsg])
+    setEditChipDismissed(true)
+    setEditExtraChips([])
+    setEditPhase('loading')
+    scrollEditToBottom()
+    setTimeout(() => {
+      const aiMsg: EditMessage = {
+        id: `edit-${Date.now()}-ai`,
+        type: 'assistant',
+        text: prompt,
+        editedTexts: activeChips.map(c => {
+          const edited = generateMockEdit(c.text)
+          return { original: c.text, edited, reasoning: generateMockReasoning(c.text) }
+        }),
+      }
+      setEditMessages(prev => [...prev, aiMsg])
+      setEditPhase('idle')
+      scrollEditToBottom()
+    }, 1400)
+  }
+
+  function startCardInsert(key: string, original: string, edited: string, anchorId?: string, comment?: string) {
+    activeInsertKeyRef.current = key
+    setCardInserts(prev => ({ ...prev, [key]: { phase: 'running', step: 1 } }))
+    setTimeout(() => {
+      setCardInserts(prev => ({ ...prev, [key]: { phase: 'running', step: 2 } }))
+      setTimeout(() => {
+        setCardInserts(prev => ({ ...prev, [key]: { phase: 'running', step: 3 } }))
+        setTimeout(() => {
+          const editId = `doc-edit-${Date.now()}`
+          onInsertEditToDoc?.(editId, original, edited, comment)
+          setCardInserts(prev => ({ ...prev, [key]: { phase: 'done', editId, anchorId } }))
+          activeInsertKeyRef.current = null
+          const next = insertQueueRef.current.shift()
+          if (next) startCardInsert(next.key, next.original, next.edited, next.anchorId, next.comment)
+        }, 700)
+      }, 700)
+    }, 700)
+  }
+
+  function handleInsertEdit(msgId: string, cardIndex: number, comment?: string) {
+    const key = `${msgId}:${cardIndex}`
+    const msg = editMessages.find(m => m.id === msgId)
+    const et = msg?.editedTexts?.[cardIndex]
+    if (!et) return
+    const anchorId = editAnchorRef.current
+    if (activeInsertKeyRef.current !== null) {
+      setCardInserts(prev => ({ ...prev, [key]: { phase: 'queued' } }))
+      insertQueueRef.current.push({ key, original: et.original, edited: et.edited, anchorId, comment })
+    } else {
+      startCardInsert(key, et.original, et.edited, anchorId, comment)
+    }
+  }
+
   const [showConfirmation, setShowConfirmation] = useState(true)
   const [dragState, setDragState] = useState<DragState>('idle')
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([])
   const dragCounterRef = useRef<number>(0)
   const pendingFileRef = useRef<string>('')
-  const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[]>([])
+  const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[]>([
+    { id: 'saved-lol', label: 'Pull a limitation of liability clause for a SaaS agreement from Vault', prompt: 'Pull a limitation of liability clause for a SaaS agreement from Vault' },
+  ])
   const [uploadingFile, setUploadingFile] = useState('')
+  const [promptOpen, setPromptOpen] = useState(false)
+  const [appliedPrompt, setAppliedPrompt] = useState<{ text: string; v: number } | null>(null)
+  const [selectedActionLabel, setSelectedActionLabel] = useState<string | null>(null)
+  const [editingText, setEditingText] = useState('')
+  const [editMessages, setEditMessages] = useState<EditMessage[]>([])
+  const [editPhase, setEditPhase] = useState<'idle' | 'loading'>('idle')
+  const editScrollRef = useRef<HTMLDivElement>(null)
+  const [selectionChipDismissed, setSelectionChipDismissed] = useState(false)
+  const [editChipDismissed, setEditChipDismissed] = useState(false)
+  const [editChipAlreadySeen, setEditChipAlreadySeen] = useState(false)
+  const [editExtraChips, setEditExtraChips] = useState<{ id: string; text: string }[]>([])
+  const prevContextChipsRef = useRef(contextChips)
+  const [cardInserts, setCardInserts] = useState<Record<string, CardInsertState>>({})
+  const activeInsertKeyRef = useRef<string | null>(null)
+  const insertQueueRef = useRef<QueueEntry[]>([])
+  const editAnchorRef = useRef<string | undefined>(undefined)
 
   const allChecked = definitions.every((d) => checked[d.id])
   const checkedCount = definitions.filter((d) => checked[d.id]).length
+
+  // Reset selection chip dismissed state whenever a new text is selected
+  useEffect(() => {
+    if (selectedText) setSelectionChipDismissed(false)
+  }, [selectedText])
+
+  // Intercept new context chips added while in text-edit mode → route them to edit space instead
+  useEffect(() => {
+    const prev = prevContextChipsRef.current
+    const newChips = contextChips.filter((c) => !prev.find((p) => p.id === c.id))
+    prevContextChipsRef.current = contextChips
+    if (mode === 'text-edit' && newChips.length > 0) {
+      setEditExtraChips((existing) => [...existing, ...newChips])
+      newChips.forEach((c) => onRemoveContextChip?.(c.id))
+    }
+  }, [contextChips]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Phase 1: animate steps 1–3 on initial send
   useEffect(() => {
@@ -539,6 +737,7 @@ export function ActionSpaceSidebarB() {
     setInsertPhase('running')
     setMode('chat')
     setView('main')
+    scrollChatToBottom()
   }
 
   function handleStop() {
@@ -593,6 +792,18 @@ export function ActionSpaceSidebarB() {
     setSavedPrompts((prev) => [{ id: `saved-${Date.now()}`, label, prompt: text }, ...prev])
   }
 
+  function handleRemoveSavedPrompt(text: string) {
+    setSavedPrompts((prev) => prev.filter((p) => p.prompt !== text))
+  }
+
+  function handleActionClick(actionId: string, label: string) {
+    setSelectedActionLabel(label)
+    if (actionId === 'analyse') {
+      setChatPhase('confirming')
+      setShowConfirmation(true)
+    }
+  }
+
   // Transition to chat after upload completes, then focus the input
   useEffect(() => {
     if (dragState !== 'uploading') return
@@ -606,6 +817,7 @@ export function ActionSpaceSidebarB() {
       setMode('chat')
       setView('main')
       setDragState('idle')
+      scrollChatToBottom()
       setTimeout(() => chatInputRef.current?.focus(), 50)
     }, 2400)
     // Clear uploading state after chip fill animation completes (~1.5s fill + 0.1s buffer)
@@ -662,22 +874,7 @@ export function ActionSpaceSidebarB() {
         <p className="text-[16px] font-medium text-foreground leading-[20px]">{insertSummary}</p>
         <p className="text-[16px] text-muted-foreground leading-[20px]">Edit will be inserted as plain text</p>
       </div>
-      <div className="flex items-center shrink-0">
-        <Button variant="default" size="default" className="rounded-r-none" onClick={handleInsert}>Insert edit</Button>
-        <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-          <PopoverTrigger
-            className={buttonVariants({ variant: 'default', size: 'default', className: 'rounded-l-none border-l border-primary-foreground/20 px-2' })}
-            aria-label="More insert options"
-          >
-            <ChevronDown className="h-3.5 w-3.5" />
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-52 p-1">
-            <Button variant="ghost" size="default" className="w-full justify-start">
-              Insert with comments
-            </Button>
-          </PopoverContent>
-        </Popover>
-      </div>
+      <InsertButton onInsert={handleInsert} onInsertWithComments={handleInsert} />
     </div>
   )
 
@@ -799,6 +996,44 @@ export function ActionSpaceSidebarB() {
         {mode === 'chat' ? (
           <div className="shrink-0 border-b border-border px-3 py-2 flex items-center bg-background">
             <span className="flex-1 text-sm font-medium text-foreground">Chat</span>
+            <Popover open={promptOpen} onOpenChange={setPromptOpen}>
+              <PopoverTrigger
+                className={buttonVariants({ variant: 'outline', size: 'icon-sm' })}
+                aria-label="Saved Prompts"
+              >
+                <Bookmark className="h-3.5 w-3.5" />
+              </PopoverTrigger>
+              <PopoverContent side="bottom" align="end" className="w-64 p-1">
+                <p className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Saved Prompts</p>
+                {savedPrompts.length > 0 && (
+                  <>
+                    <div className="space-y-0.5">
+                      {savedPrompts.map((item) => (
+                        <button
+                          key={item.id}
+                          onClick={() => { setAppliedPrompt({ text: item.prompt, v: Date.now() }); setPromptOpen(false) }}
+                          className="w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="my-1 h-px bg-border" />
+                  </>
+                )}
+                <div className="space-y-0.5">
+                  {predefinedActions.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => { setAppliedPrompt({ text: item.prompt, v: Date.now() }); setPromptOpen(false) }}
+                      className="w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
         ) : view === 'main' ? (
           <div className="shrink-0 border-b border-border px-3 py-2 flex items-center gap-2 bg-background">
@@ -807,9 +1042,11 @@ export function ActionSpaceSidebarB() {
               {sep}
               <span className="text-sm font-medium text-foreground">Edit Space</span>
             </div>
-            <Button variant="secondary" size="xs" onClick={() => setShowRedline((v) => !v)} className="shrink-0">
-              {showRedline ? 'Hide redline' : 'Show redline'}
-            </Button>
+            {agentStep >= 6 && (
+              <Button variant="secondary" size="xs" onClick={() => setShowRedline((v) => !v)} className="shrink-0">
+                {showRedline ? 'Hide redline' : 'Show redline'}
+              </Button>
+            )}
           </div>
         ) : (
           <div className="shrink-0 border-b border-border px-3 py-2 flex items-center gap-1 bg-background">
@@ -824,7 +1061,7 @@ export function ActionSpaceSidebarB() {
         {/* ── Chat mode ── */}
         {mode === 'chat' && (
           <div className="flex-1 flex flex-col min-h-0">
-            <div className="flex-1 overflow-y-auto min-h-0">
+            <div ref={chatScrollRef} className="flex-1 overflow-y-auto min-h-0">
               {/* Working on Edit Space — sticky at top of scroll area, content scrolls under */}
               {agentStep >= 6 && hasVisitedEditSpace && (
                 <div className="sticky top-0 z-10 px-3 pb-2">
@@ -839,30 +1076,50 @@ export function ActionSpaceSidebarB() {
               )}
 
               <div className="px-3 py-3 flex flex-col gap-5">
-              {chatPhase !== 'idle' && (
+              {/* Empty state — pre-defined action cards */}
+              {chatPhase === 'idle' && selectedActionLabel === null && (
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs font-medium text-muted-foreground">Pre-defined Actions</p>
+                  {predefinedActions.map((action) => (
+                    <button
+                      key={action.id}
+                      onClick={() => handleActionClick(action.id, action.label)}
+                      className="w-full text-left rounded-xl border border-border bg-background px-3 py-3 hover:bg-accent transition-colors flex items-center gap-2 group"
+                    >
+                      <span className="flex-1 text-[16px] leading-[20px] text-foreground">{action.label}</span>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {selectedActionLabel !== null && (
                 <>
                   {/* User message */}
                   {(() => {
-                    const msg = 'Pull a limitation of liability clause for a SaaS agreement from Vault'
-                    const isSaved = savedPrompts.some((p) => p.prompt === msg)
+                    const label = selectedActionLabel as string
+                    const isSaved = savedPrompts.some((p) => p.prompt === label)
+                    const isPredefined = predefinedActions.some((a) => a.prompt === label)
                     return (
                       <div className="flex justify-end group/msg">
                         <div className="flex flex-col items-end gap-1 w-full">
                           <div className="w-full rounded-xl rounded-tr-sm bg-[#B8C1DE] text-foreground px-3 py-2 text-[16px] leading-relaxed">
-                            {msg}
+                            {label}
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => handleSavePrompt(msg)}
-                            className="opacity-0 group-hover/msg:opacity-100 transition-opacity flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-                            aria-label="Save as prompt"
-                          >
-                            {isSaved
-                              ? <Bookmark className="h-3 w-3 fill-current" />
-                              : <BookmarkPlus className="h-3 w-3" />
-                            }
-                            {isSaved ? 'Saved' : 'Save'}
-                          </button>
+                          {!isPredefined && (
+                            <button
+                              type="button"
+                              onClick={() => isSaved ? handleRemoveSavedPrompt(label) : handleSavePrompt(label)}
+                              className="opacity-0 group-hover/msg:opacity-100 transition-opacity flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                              aria-label={isSaved ? 'Remove from Saved Prompts' : 'Save prompt'}
+                            >
+                              {isSaved
+                                ? <Bookmark className="h-3 w-3 fill-current" />
+                                : <BookmarkPlus className="h-3 w-3" />
+                              }
+                              {isSaved ? 'Remove from Saved Prompts' : 'Save prompt'}
+                            </button>
+                          )}
                         </div>
                       </div>
                     )
@@ -982,8 +1239,38 @@ export function ActionSpaceSidebarB() {
                 </div>
               )}
 
-              <div className="px-3 py-3">
-                <ChatInput onSend={() => { setChatPhase('confirming'); setShowConfirmation(true) }} placeholder="Ask Enhance" rows={2} inputRef={chatInputRef} attachedFiles={uploadedFiles} onRemoveFile={(i) => setUploadedFiles((prev) => prev.filter((_, idx) => idx !== i))} savedPrompts={savedPrompts} uploadingFile={uploadingFile} isDragActive={dragState === 'dragging'} />
+              {selectedText && (
+                <div className="flex gap-2 px-3 py-2 border-b border-border">
+                  <button
+                    type="button"
+                    onClick={handleEditButtonClick}
+                    className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                  >
+                    <Pencil className="h-3.5 w-3.5 shrink-0" />
+                    Edit
+                  </button>
+                </div>
+              )}
+              <div className="px-3 pb-3 pt-3">
+                <ChatInput
+                  onSend={(text) => { setSelectedActionLabel(text); setChatPhase('confirming'); setShowConfirmation(true) }}
+                  placeholder="Ask Enhance"
+                  rows={2}
+                  inputRef={chatInputRef}
+                  attachedFiles={uploadedFiles}
+                  onRemoveFile={(i) => setUploadedFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                  promptToApply={appliedPrompt}
+                  uploadingFile={uploadingFile}
+                  isDragActive={dragState === 'dragging'}
+                  contextChips={[
+                    ...contextChips,
+                    ...(selectedText && !selectionChipDismissed ? [{ id: 'sel-text', text: selectedText }] : []),
+                  ]}
+                  onRemoveContextChip={(id) => {
+                    if (id === 'sel-text') setSelectionChipDismissed(true)
+                    else onRemoveContextChip?.(id)
+                  }}
+                />
               </div>
             </div>
           </div>
@@ -1010,33 +1297,10 @@ export function ActionSpaceSidebarB() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, ease: 'easeOut', delay: 0.15 }}
               >
-                <div className="rounded border border-border bg-[#d3d9eb] px-3 py-2.5 flex flex-col gap-1">
-                  <button
-                    onClick={() => setReasonExpanded((v) => !v)}
-                    className="flex items-center gap-3 text-left w-full"
-                  >
-                    <p className="flex-1 text-[16px] font-medium leading-[20px] text-muted-foreground">Reason for change</p>
-                    {reasonExpanded
-                      ? <ChevronUp className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                      : <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    }
-                  </button>
-                  <AnimatePresence initial={false}>
-                  {reasonExpanded && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2, ease: 'easeInOut' }}
-                      style={{ overflow: 'hidden' }}
-                    >
-                      <p className="text-[16px] leading-[20px] pt-1">
-                        These changes would narrow the Borrower's authorisation without materially departing from market-standard LMA risk allocation, while providing protection against defective or fraudulent claims.
-                      </p>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-                </div>
+                <ExpandableCallout
+                  title="Reason for change"
+                  body="These changes would narrow the Borrower's authorisation without materially departing from market-standard LMA risk allocation, while providing protection against defective or fraudulent claims."
+                />
               </motion.div>
 
               <motion.div
@@ -1143,6 +1407,115 @@ export function ActionSpaceSidebarB() {
               {tabs.find((t) => t.id === activeTab)?.label} — coming soon
             </p>
           </div>
+        )}
+
+        {/* ── Text Edit mode ── */}
+        {mode === 'text-edit' && (
+          <>
+            {/* Scroll area */}
+            <div ref={editScrollRef} className="flex-1 overflow-y-auto min-h-0 px-3 py-3 flex flex-col gap-3">
+
+              {/* Conversation */}
+              {editMessages.map((msg) => (
+                msg.type === 'user' ? (
+                  <div key={msg.id} className="flex justify-end">
+                    <div className="w-full rounded-xl rounded-tr-sm bg-[#B8C1DE] text-foreground px-3 py-2 text-sm leading-relaxed flex flex-col gap-2">
+                      <span>{msg.text}</span>
+                      {msg.chips && msg.chips.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {msg.chips.map((c) => (
+                            <div key={c.id} className="inline-flex items-center gap-1.5 rounded-md border border-border/40 bg-white/30 px-2 py-1 text-xs text-foreground max-w-full">
+                              <Quote className="h-3.5 w-3.5 shrink-0 opacity-70" />
+                              <span className="truncate">{c.text}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div key={msg.id} className="flex flex-col gap-2">
+                    {msg.editedTexts?.map((et, i) => {
+                      const cardKey = `${msg.id}:${i}`
+                      const cardState = cardInserts[cardKey] ?? { phase: 'idle' }
+                      return (
+                        <div key={i} className="rounded-xl border border-border bg-background px-3 py-3 flex flex-col gap-3">
+                          <p className="text-xs font-medium text-muted-foreground">Suggested edit</p>
+                          {/* Content */}
+                          <div className="flex flex-col gap-1.5">
+                            <p className="text-sm text-muted-foreground line-through leading-relaxed">{et.original}</p>
+                            <p className="text-sm text-foreground leading-relaxed">{et.edited}</p>
+                          </div>
+                          {/* Reasoning */}
+                          <ExpandableCallout title="Reasoning" body={et.reasoning} />
+                          {/* Divider */}
+                          <div className="h-px bg-border -mx-3" />
+                          {/* Actions / state */}
+                          {cardState.phase === 'idle' && (
+                            <InsertButton
+                              onInsert={() => handleInsertEdit(msg.id, i)}
+                              onInsertWithComments={() => handleInsertEdit(msg.id, i, et.reasoning)}
+                            />
+                          )}
+                          {cardState.phase === 'queued' && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                              <Loader2 className="h-3 w-3 animate-spin shrink-0" />
+                              Waiting in queue…
+                            </p>
+                          )}
+                          {cardState.phase === 'running' && (
+                            <div className="flex flex-col">
+                              <TimelineStep status={cardState.step === 1 ? 'loading' : 'done'} label="Locating text" description="Searching the document for the selected passage…" showConnector={true} />
+                              <TimelineStep status={cardState.step === 1 ? 'waiting' : cardState.step === 2 ? 'loading' : 'done'} label="Applying edit" description="Replacing with your suggested revision…" showConnector={true} />
+                              <TimelineStep status={(cardState.step ?? 0) < 3 ? 'waiting' : 'loading'} label="Finalising" description="Saving changes to the document…" showConnector={false} />
+                            </div>
+                          )}
+                          {cardState.phase === 'done' && (
+                            <div className="flex items-center justify-between">
+                              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                                <Check className="h-3 w-3 text-green-600" /> Inserted
+                              </p>
+                              <Button variant="ghost" size="sm" onClick={() => {
+                                const target = cardState.anchorId ?? cardState.editId
+                                if (target) onGoToEdit?.(target)
+                              }}>
+                                Go to edit
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              ))}
+
+              {/* Loading */}
+              {editPhase === 'loading' && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground px-1">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
+                  Editing…
+                </div>
+              )}
+            </div>
+
+            {/* Sticky footer */}
+            <div className="shrink-0 border-t border-border bg-background px-3 py-3">
+              <ChatInput
+                onSend={handleEditSend}
+                placeholder="Describe the edit…"
+                rows={2}
+                contextChips={[
+                  ...(editChipDismissed ? [] : [{ id: 'edit-selection', text: editingText, skipAnimation: editChipAlreadySeen }]),
+                  ...editExtraChips,
+                ]}
+                onRemoveContextChip={(id) => {
+                  if (id === 'edit-selection') setEditChipDismissed(true)
+                  else setEditExtraChips((prev) => prev.filter((c) => c.id !== id))
+                }}
+              />
+            </div>
+          </>
         )}
 
       </div>

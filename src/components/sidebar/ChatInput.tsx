@@ -1,20 +1,47 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
-import { Paperclip, BookOpen, ArrowUp, FileText, X, Loader2 } from 'lucide-react'
+import { Paperclip, ArrowUp, FileText, X, Loader2, Quote } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 
-const defaultPrompts = [
-  { id: 'p1', label: 'Pull limitation of liability clause', prompt: 'Pull a limitation of liability clause for a SaaS agreement from Vault' },
-  { id: 'p2', label: 'Identify risks', prompt: 'What are the key risks in this clause for my client?' },
-  { id: 'p3', label: 'Suggest alternatives', prompt: 'Suggest three alternative formulations for this clause.' },
-  { id: 'p6', label: 'Find any Unused Terms', prompt: 'Identify any defined terms in the draft that are not actually used in any clause.' },
-  { id: 'p7', label: 'Find Undefined Terms', prompt: 'Identify any terms used in the draft that have not been defined.' },
-  { id: 'p8', label: 'Find cascading issues', prompt: 'Identify any clauses that may create cascading obligations or conflicts with other clauses in the draft.' },
-]
-
 export type SavedPrompt = { id: string; label: string; prompt: string }
+
+function ContextChip({
+  text,
+  index,
+  skipAnimation,
+  onRemove,
+}: {
+  text: string
+  index: number
+  skipAnimation?: boolean
+  onRemove: () => void
+}) {
+  const entryProps = skipAnimation
+    ? {}
+    : { initial: { opacity: 0, scale: 0.85, y: 4 } }
+  return (
+    <motion.div
+      {...entryProps}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.85, y: 4 }}
+      transition={{ type: 'spring', bounce: 0.35, delay: skipAnimation ? 0 : 0.05 + index * 0.06 }}
+      className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 shrink-0 max-w-[240px]"
+    >
+      <Quote className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+      <span className="text-xs text-foreground truncate">{text}</span>
+      <button
+        type="button"
+        onClick={onRemove}
+        className="ml-0.5 shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+        aria-label="Remove context"
+      >
+        <X className="h-3 w-3" />
+      </button>
+    </motion.div>
+  )
+}
 
 // Chip with a spinner in place of the remove button while the file is uploading.
 // Once upload completes the spinner crossfades into the X button.
@@ -77,14 +104,15 @@ interface ChatInputProps {
   inputRef?: React.RefObject<HTMLTextAreaElement | null>
   attachedFiles?: string[]
   onRemoveFile?: (index: number) => void
-  savedPrompts?: SavedPrompt[]
+  promptToApply?: { text: string; v: number } | null
   uploadingFile?: string
   isDragActive?: boolean
+  contextChips?: { id: string; text: string; skipAnimation?: boolean }[]
+  onRemoveContextChip?: (id: string) => void
 }
 
-export function ChatInput({ onSend, placeholder = 'Ask the AI assistant…', rows = 1, inputRef, attachedFiles = [], onRemoveFile, savedPrompts = [], uploadingFile, isDragActive }: ChatInputProps) {
+export function ChatInput({ onSend, placeholder = 'Ask the AI assistant…', rows = 1, inputRef, attachedFiles = [], onRemoveFile, promptToApply, uploadingFile, isDragActive, contextChips = [], onRemoveContextChip }: ChatInputProps) {
   const [value, setValue] = useState('')
-  const [promptOpen, setPromptOpen] = useState(false)
   const [overflowOpen, setOverflowOpen] = useState(false)
   const [focused, setFocused] = useState(false)
   const [highlighted, setHighlighted] = useState(false)
@@ -99,6 +127,14 @@ export function ChatInput({ onSend, placeholder = 'Ask the AI assistant…', row
   useEffect(() => {
     if (attachedFiles.length > 0) textareaRef.current?.focus()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Apply a prompt selected from the header popover
+  useEffect(() => {
+    if (promptToApply) {
+      setValue(promptToApply.text)
+      textareaRef.current?.focus()
+    }
+  }, [promptToApply]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Pulse a highlight ring when a new file is added
   useEffect(() => {
@@ -143,12 +179,6 @@ export function ChatInput({ onSend, placeholder = 'Ask the AI assistant…', row
     setVisibleCount(Math.max(1, count))
   }, [attachedFiles])
 
-  function applyPrompt(prompt: string) {
-    setValue(prompt)
-    setPromptOpen(false)
-    textareaRef.current?.focus()
-  }
-
   function handleSend() {
     const text = value.trim()
     if (!text) return
@@ -177,10 +207,10 @@ export function ChatInput({ onSend, placeholder = 'Ask the AI assistant…', row
         isDragActive && !focused && 'border-ring ring-2 ring-ring/40'
       )}
     >
-      {/* Attached files section — above textarea
+      {/* Attached files + context section — above textarea
           AnimatePresence without initial={false} so the animation plays on first mount */}
       <AnimatePresence>
-        {attachedFiles.length > 0 && (
+        {(attachedFiles.length > 0 || contextChips.length > 0) && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
@@ -188,61 +218,79 @@ export function ChatInput({ onSend, placeholder = 'Ask the AI assistant…', row
             transition={{ duration: 0.22, ease: [0.25, 0, 0, 1] }}
             style={{ overflow: 'hidden' }}
           >
-            <div className="border-b border-input px-2 pt-2 pb-1.5">
-              <div className="relative">
-                {/* Hidden measurement layer */}
-                <div
-                  ref={measureRef}
-                  className="absolute top-0 left-0 w-full invisible flex gap-1.5 pointer-events-none"
-                  aria-hidden="true"
-                >
-                  {attachedFiles.map((file, i) => (
-                    <div key={i} data-chip className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 shrink-0">
-                      <FileText className="h-3.5 w-3.5 shrink-0" />
-                      <span className="text-xs max-w-[120px] truncate whitespace-nowrap">{file}</span>
-                      <div className="h-3 w-3 ml-0.5 shrink-0" />
-                    </div>
-                  ))}
-                </div>
+            <div className="border-b border-input px-2 pt-2 pb-1.5 flex flex-col gap-1.5">
+              {attachedFiles.length > 0 && (
+                <div className="relative">
+                  {/* Hidden measurement layer */}
+                  <div
+                    ref={measureRef}
+                    className="absolute top-0 left-0 w-full invisible flex gap-1.5 pointer-events-none"
+                    aria-hidden="true"
+                  >
+                    {attachedFiles.map((file, i) => (
+                      <div key={i} data-chip className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 shrink-0">
+                        <FileText className="h-3.5 w-3.5 shrink-0" />
+                        <span className="text-xs max-w-[120px] truncate whitespace-nowrap">{file}</span>
+                        <div className="h-3 w-3 ml-0.5 shrink-0" />
+                      </div>
+                    ))}
+                  </div>
 
-                {/* Visible chip row — each chip springs in with a stagger */}
-                <div ref={containerRef} className="flex items-center gap-1.5">
-                  {attachedFiles.slice(0, visibleCount).map((file, i) => (
-                    <FileChip
-                      key={file + i}
-                      file={file}
-                      index={i}
-                      isUploading={uploadingFile === file}
-                      onRemove={() => onRemoveFile?.(i)}
-                    />
-                  ))}
+                  {/* Visible chip row — each chip springs in with a stagger */}
+                  <div ref={containerRef} className="flex items-center gap-1.5">
+                    {attachedFiles.slice(0, visibleCount).map((file, i) => (
+                      <FileChip
+                        key={file + i}
+                        file={file}
+                        index={i}
+                        isUploading={uploadingFile === file}
+                        onRemove={() => onRemoveFile?.(i)}
+                      />
+                    ))}
 
-                  {overflowCount > 0 && (
-                    <Popover open={overflowOpen} onOpenChange={setOverflowOpen}>
-                      <PopoverTrigger className="inline-flex items-center rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors shrink-0">
-                        +{overflowCount}
-                      </PopoverTrigger>
-                      <PopoverContent side="top" align="end" className="w-56 p-1">
-                        <p className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Attached Files</p>
-                        {attachedFiles.slice(visibleCount).map((file, i) => (
-                          <div key={file + i} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent group">
-                            <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                            <span className="flex-1 text-sm truncate">{file}</span>
-                            <button
-                              type="button"
-                              onClick={() => { onRemoveFile?.(visibleCount + i); setOverflowOpen(false) }}
-                              className="text-muted-foreground hover:text-foreground transition-colors opacity-0 group-hover:opacity-100 shrink-0"
-                              aria-label={`Remove ${file}`}
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </div>
-                        ))}
-                      </PopoverContent>
-                    </Popover>
-                  )}
+                    {overflowCount > 0 && (
+                      <Popover open={overflowOpen} onOpenChange={setOverflowOpen}>
+                        <PopoverTrigger className="inline-flex items-center rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors shrink-0">
+                          +{overflowCount}
+                        </PopoverTrigger>
+                        <PopoverContent side="top" align="end" className="w-56 p-1">
+                          <p className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Attached Files</p>
+                          {attachedFiles.slice(visibleCount).map((file, i) => (
+                            <div key={file + i} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent group">
+                              <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                              <span className="flex-1 text-sm truncate">{file}</span>
+                              <button
+                                type="button"
+                                onClick={() => { onRemoveFile?.(visibleCount + i); setOverflowOpen(false) }}
+                                className="text-muted-foreground hover:text-foreground transition-colors opacity-0 group-hover:opacity-100 shrink-0"
+                                aria-label={`Remove ${file}`}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </PopoverContent>
+                      </Popover>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {contextChips.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  <AnimatePresence>
+                    {contextChips.map((chip, i) => (
+                      <ContextChip
+                        key={chip.id}
+                        text={chip.text}
+                        index={i}
+                        skipAnimation={chip.skipAnimation}
+                        onRemove={() => onRemoveContextChip?.(chip.id)}
+                      />
+                    ))}
+                  </AnimatePresence>
+                </div>
+              )}
             </div>
           </motion.div>
         )}
@@ -265,45 +313,6 @@ export function ChatInput({ onSend, placeholder = 'Ask the AI assistant…', row
         <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" disabled aria-label="Attach documents">
           <Paperclip className="h-3.5 w-3.5" />
         </Button>
-
-        <Popover open={promptOpen} onOpenChange={setPromptOpen}>
-          <PopoverTrigger
-            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-            aria-label="Saved Prompts"
-          >
-            <BookOpen className="h-3.5 w-3.5" />
-          </PopoverTrigger>
-          <PopoverContent side="top" align="end" className="w-64 p-1">
-            <p className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Saved Prompts</p>
-            {savedPrompts.length > 0 && (
-              <>
-                <div className="space-y-0.5">
-                  {savedPrompts.map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => applyPrompt(item.prompt)}
-                      className="w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-                <div className="my-1 h-px bg-border" />
-              </>
-            )}
-            <div className="space-y-0.5">
-              {defaultPrompts.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => applyPrompt(item.prompt)}
-                  className="w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          </PopoverContent>
-        </Popover>
 
         <Button
           size="icon"
