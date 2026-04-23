@@ -8,6 +8,7 @@ export interface InsertedEdit {
   id: string
   original: string
   edited: string
+  comment?: string
 }
 
 interface DocumentViewerProps {
@@ -20,7 +21,13 @@ interface DocumentViewerProps {
   highlightedSectionId?: string | null
 }
 
-function renderInline(nodes: RichText, onTermClick?: (termId: string) => void, insertedEdits?: InsertedEdit[]) {
+function renderInline(
+  nodes: RichText,
+  onTermClick?: (termId: string) => void,
+  insertedEdits?: InsertedEdit[],
+  onCommentToggle?: (id: string) => void,
+  openCommentId?: string | null,
+) {
   return nodes.map((node, i) => {
     if (node.type === 'text') {
       if (insertedEdits) {
@@ -36,6 +43,25 @@ function renderInline(nodes: RichText, onTermClick?: (termId: string) => void, i
                 >
                   {edit.edited}
                 </mark>
+                {edit.comment && (
+                  <button
+                    type="button"
+                    className="relative ml-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-amber-400 hover:bg-amber-500 transition-colors align-middle -translate-y-0.5"
+                    onClick={(e) => { e.stopPropagation(); onCommentToggle?.(edit.id) }}
+                    aria-label="View comment"
+                  >
+                    <MessageSquare className="h-2.5 w-2.5 text-white" />
+                    {openCommentId === edit.id && (
+                      <div
+                        className="absolute left-0 top-5 z-50 w-64 rounded-lg border border-border bg-popover p-3 text-left shadow-lg"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <p className="text-xs font-medium text-foreground mb-1">Comment</p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">{edit.comment}</p>
+                      </div>
+                    )}
+                  </button>
+                )}
                 {node.text.slice(idx + edit.original.length)}
               </span>
             )
@@ -57,24 +83,24 @@ function renderInline(nodes: RichText, onTermClick?: (termId: string) => void, i
   })
 }
 
-function renderSubclauses(subclauses: NumberedClause[], onTermClick?: (termId: string) => void, insertedEdits?: InsertedEdit[]) {
+function renderSubclauses(subclauses: NumberedClause[], onTermClick?: (termId: string) => void, insertedEdits?: InsertedEdit[], onCommentToggle?: (id: string) => void, openCommentId?: string | null) {
   return (
     <div className="pl-6 mt-1.5 space-y-1.5">
       {subclauses.map((sub) => (
         <div key={sub.number} className="flex gap-3 text-sm leading-relaxed">
           <span className="shrink-0 text-muted-foreground w-6">{sub.number}</span>
-          <span>{renderInline(sub.content, onTermClick, insertedEdits)}</span>
+          <span>{renderInline(sub.content, onTermClick, insertedEdits, onCommentToggle, openCommentId)}</span>
         </div>
       ))}
     </div>
   )
 }
 
-function renderSectionBlock(block: SectionBlock, onTermClick?: (termId: string) => void, insertedEdits?: InsertedEdit[]) {
+function renderSectionBlock(block: SectionBlock, onTermClick?: (termId: string) => void, insertedEdits?: InsertedEdit[], onCommentToggle?: (id: string) => void, openCommentId?: string | null) {
   if (block.type === 'paragraph') {
     return (
       <p className="mb-3 text-sm leading-relaxed text-foreground">
-        {renderInline(block.content, onTermClick, insertedEdits)}
+        {renderInline(block.content, onTermClick, insertedEdits, onCommentToggle, openCommentId)}
       </p>
     )
   }
@@ -84,7 +110,7 @@ function renderSectionBlock(block: SectionBlock, onTermClick?: (termId: string) 
       <p className="mb-3 text-sm leading-relaxed">
         <span className="font-semibold">"{block.term}"</span>
         <span className="text-muted-foreground"> means </span>
-        <span>{renderInline(block.content, onTermClick, insertedEdits)}</span>
+        <span>{renderInline(block.content, onTermClick, insertedEdits, onCommentToggle, openCommentId)}</span>
       </p>
     )
   }
@@ -94,9 +120,9 @@ function renderSectionBlock(block: SectionBlock, onTermClick?: (termId: string) 
       <div className="mb-3">
         <div className="flex gap-3 text-sm leading-relaxed">
           <span className="shrink-0 font-medium text-foreground w-8">{block.number}</span>
-          <span className="flex-1">{renderInline(block.content, onTermClick, insertedEdits)}</span>
+          <span className="flex-1">{renderInline(block.content, onTermClick, insertedEdits, onCommentToggle, openCommentId)}</span>
         </div>
-        {block.subclauses && renderSubclauses(block.subclauses, onTermClick, insertedEdits)}
+        {block.subclauses && renderSubclauses(block.subclauses, onTermClick, insertedEdits, onCommentToggle, openCommentId)}
       </div>
     )
   }
@@ -104,7 +130,7 @@ function renderSectionBlock(block: SectionBlock, onTermClick?: (termId: string) 
   return null
 }
 
-function renderBlock(block: DocumentBlock, onTermClick?: (termId: string) => void, insertedEdits?: InsertedEdit[], highlightedSectionId?: string | null) {
+function renderBlock(block: DocumentBlock, onTermClick?: (termId: string) => void, insertedEdits?: InsertedEdit[], highlightedSectionId?: string | null, onCommentToggle?: (id: string) => void, openCommentId?: string | null) {
   if (block.type === 'title') {
     return (
       <div key="title" className="text-center mb-10">
@@ -154,7 +180,7 @@ function renderBlock(block: DocumentBlock, onTermClick?: (termId: string) => voi
             return (
               <div key={i} className="flex gap-3">
                 <span className="shrink-0 font-medium text-foreground">{letter}.</span>
-                <span>{renderInline(item, onTermClick, insertedEdits)}</span>
+                <span>{renderInline(item, onTermClick, insertedEdits, onCommentToggle, openCommentId)}</span>
               </div>
             )
           })}
@@ -178,7 +204,7 @@ function renderBlock(block: DocumentBlock, onTermClick?: (termId: string) => voi
         </h2>
         <div>
           {block.blocks.map((b, i) => (
-            <div key={i}>{renderSectionBlock(b, onTermClick, insertedEdits)}</div>
+            <div key={i}>{renderSectionBlock(b, onTermClick, insertedEdits, onCommentToggle, openCommentId)}</div>
           ))}
         </div>
       </section>
@@ -220,7 +246,12 @@ function renderBlock(block: DocumentBlock, onTermClick?: (termId: string) => voi
 
 export function DocumentViewer({ onTermClick, onAskContext, onEditContext, onSelectionChange, insertedEdits, goToEditId, highlightedSectionId }: DocumentViewerProps) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; text: string } | null>(null)
+  const [openCommentId, setOpenCommentId] = useState<string | null>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+  function handleCommentToggle(id: string) {
+    setOpenCommentId(prev => prev === id ? null : id)
+  }
 
   useEffect(() => {
     function handleSelectionChange() {
@@ -273,7 +304,9 @@ export function DocumentViewer({ onTermClick, onAskContext, onEditContext, onSel
           <p className="text-xs text-muted-foreground">CONFIDENTIAL</p>
         </div>
         {mockDocument.blocks.map((block, i) => (
-          <div key={i}>{renderBlock(block, onTermClick, insertedEdits, highlightedSectionId)}</div>
+          <div key={i} onClick={() => setOpenCommentId(null)}>
+            {renderBlock(block, onTermClick, insertedEdits, highlightedSectionId, handleCommentToggle, openCommentId)}
+          </div>
         ))}
       </div>
 

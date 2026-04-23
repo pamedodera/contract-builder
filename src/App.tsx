@@ -25,8 +25,8 @@ function App() {
     setContextChips((prev) => prev.filter((c) => c.id !== id))
   }, [])
 
-  const handleInsertEditToDoc = useCallback((id: string, original: string, edited: string) => {
-    setInsertedEdits((prev) => [...prev, { id, original, edited }])
+  const handleInsertEditToDoc = useCallback((id: string, original: string, edited: string, comment?: string) => {
+    setInsertedEdits((prev) => [...prev, { id, original, edited, comment }])
   }, [])
 
   const handleGoToEdit = useCallback((id: string) => {

@@ -8,6 +8,8 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ChatInput, type SavedPrompt } from '@/components/sidebar/ChatInput'
 import { ClauseCardFlat } from './ClauseCardFlat'
+import { ExpandableCallout } from '@/components/ui/expandable-callout'
+import { InsertButton } from '@/components/ui/insert-button'
 
 type Tab = 'vault' | 'draft' | 'proof' | 'cascade' | 'enhance'
 type View = 'main' | 'definitions'
@@ -18,7 +20,7 @@ interface EditMessage {
   type: 'user' | 'assistant'
   text: string
   chips?: { id: string; text: string }[]
-  editedTexts?: { original: string; edited: string }[]
+  editedTexts?: { original: string; edited: string; reasoning: string }[]
   editedText?: string
   inserted?: boolean
 }
@@ -415,6 +417,7 @@ interface QueueEntry {
   original: string
   edited: string
   anchorId?: string
+  comment?: string
 }
 
 interface ActionSpaceSidebarBProps {
@@ -435,8 +438,8 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, se
   const [agentStep, setAgentStep] = useState(0)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [hasVisitedEditSpace, setHasVisitedEditSpace] = useState(false)
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [reasonExpanded, setReasonExpanded] = useState(false)
+
+
   const [showRedline, setShowRedline] = useState(true)
   const [checked, setChecked] = useState<Record<string, boolean>>(
     Object.fromEntries(definitions.map((d) => [d.id, true]))
@@ -471,6 +474,16 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, se
       .replace(/\bin accordance with\b/g, 'under')
       .replace(/\bpursuant to\b/g, 'under')
       .replace(/\bnotwithstanding\b/g, 'despite')
+  }
+
+  function generateMockReasoning(original: string, edited: string): string {
+    const changes: string[] = []
+    if (/\bshall\b/.test(original)) changes.push('"shall" replaced with "must" to align with plain English drafting standards and remove ambiguity about obligation')
+    if (/\bimmediately\b/.test(original)) changes.push('"immediately" replaced with "promptly" to avoid an unworkable absolute standard — "promptly" implies reasonable speed without implying instantaneous action')
+    if (/\bin accordance with\b/.test(original) || /\bpursuant to\b/.test(original)) changes.push('verbose cross-reference language simplified to "under" for concision')
+    if (/\bnotwithstanding\b/.test(original)) changes.push('"notwithstanding" replaced with "despite" to improve readability without changing legal meaning')
+    if (changes.length === 0) changes.push('clause rephrased to improve clarity and reduce ambiguity while preserving the original legal intent')
+    return changes.join('; ') + '.'
   }
 
   function handleEditButtonClick() {
@@ -513,7 +526,10 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, se
         id: `edit-${Date.now()}-ai`,
         type: 'assistant',
         text: prompt,
-        editedTexts: activeChips.map(c => ({ original: c.text, edited: generateMockEdit(c.text) })),
+        editedTexts: activeChips.map(c => {
+          const edited = generateMockEdit(c.text)
+          return { original: c.text, edited, reasoning: generateMockReasoning(c.text, edited) }
+        }),
       }
       setEditMessages(prev => [...prev, aiMsg])
       setEditPhase('idle')
@@ -521,7 +537,7 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, se
     }, 1400)
   }
 
-  function startCardInsert(key: string, original: string, edited: string, anchorId?: string) {
+  function startCardInsert(key: string, original: string, edited: string, anchorId?: string, comment?: string) {
     activeInsertKeyRef.current = key
     setCardInserts(prev => ({ ...prev, [key]: { phase: 'running', step: 1 } }))
     setTimeout(() => {
@@ -530,17 +546,17 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, se
         setCardInserts(prev => ({ ...prev, [key]: { phase: 'running', step: 3 } }))
         setTimeout(() => {
           const editId = `doc-edit-${Date.now()}`
-          onInsertEditToDoc?.(editId, original, edited)
+          onInsertEditToDoc?.(editId, original, edited, comment)
           setCardInserts(prev => ({ ...prev, [key]: { phase: 'done', editId, anchorId } }))
           activeInsertKeyRef.current = null
           const next = insertQueueRef.current.shift()
-          if (next) startCardInsert(next.key, next.original, next.edited, next.anchorId)
+          if (next) startCardInsert(next.key, next.original, next.edited, next.anchorId, next.comment)
         }, 700)
       }, 700)
     }, 700)
   }
 
-  function handleInsertEdit(msgId: string, cardIndex: number) {
+  function handleInsertEdit(msgId: string, cardIndex: number, comment?: string) {
     const key = `${msgId}:${cardIndex}`
     const msg = editMessages.find(m => m.id === msgId)
     const et = msg?.editedTexts?.[cardIndex]
@@ -548,9 +564,9 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, se
     const anchorId = editAnchorRef.current
     if (activeInsertKeyRef.current !== null) {
       setCardInserts(prev => ({ ...prev, [key]: { phase: 'queued' } }))
-      insertQueueRef.current.push({ key, original: et.original, edited: et.edited, anchorId })
+      insertQueueRef.current.push({ key, original: et.original, edited: et.edited, anchorId, comment })
     } else {
-      startCardInsert(key, et.original, et.edited, anchorId)
+      startCardInsert(key, et.original, et.edited, anchorId, comment)
     }
   }
 
@@ -858,22 +874,7 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, se
         <p className="text-[16px] font-medium text-foreground leading-[20px]">{insertSummary}</p>
         <p className="text-[16px] text-muted-foreground leading-[20px]">Edit will be inserted as plain text</p>
       </div>
-      <div className="flex items-center shrink-0">
-        <Button variant="default" size="default" className="rounded-r-none" onClick={handleInsert}>Insert edit</Button>
-        <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-          <PopoverTrigger
-            className={buttonVariants({ variant: 'default', size: 'default', className: 'rounded-l-none border-l border-primary-foreground/20 px-2' })}
-            aria-label="More insert options"
-          >
-            <ChevronDown className="h-3.5 w-3.5" />
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-52 p-1">
-            <Button variant="ghost" size="default" className="w-full justify-start">
-              Insert with comments
-            </Button>
-          </PopoverContent>
-        </Popover>
-      </div>
+      <InsertButton onInsert={handleInsert} onInsertWithComments={handleInsert} />
     </div>
   )
 
@@ -1296,33 +1297,10 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, se
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, ease: 'easeOut', delay: 0.15 }}
               >
-                <div className="rounded border border-border bg-[#d3d9eb] px-3 py-2.5 flex flex-col gap-1">
-                  <button
-                    onClick={() => setReasonExpanded((v) => !v)}
-                    className="flex items-center gap-3 text-left w-full"
-                  >
-                    <p className="flex-1 text-[16px] font-medium leading-[20px] text-muted-foreground">Reason for change</p>
-                    {reasonExpanded
-                      ? <ChevronUp className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                      : <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    }
-                  </button>
-                  <AnimatePresence initial={false}>
-                  {reasonExpanded && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2, ease: 'easeInOut' }}
-                      style={{ overflow: 'hidden' }}
-                    >
-                      <p className="text-[16px] leading-[20px] pt-1">
-                        These changes would narrow the Borrower's authorisation without materially departing from market-standard LMA risk allocation, while providing protection against defective or fraudulent claims.
-                      </p>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-                </div>
+                <ExpandableCallout
+                  title="Reason for change"
+                  body="These changes would narrow the Borrower's authorisation without materially departing from market-standard LMA risk allocation, while providing protection against defective or fraudulent claims."
+                />
               </motion.div>
 
               <motion.div
@@ -1468,13 +1446,16 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, se
                             <p className="text-sm text-muted-foreground line-through leading-relaxed">{et.original}</p>
                             <p className="text-sm text-foreground leading-relaxed">{et.edited}</p>
                           </div>
+                          {/* Reasoning */}
+                          <ExpandableCallout title="Reasoning" body={et.reasoning} />
                           {/* Divider */}
                           <div className="h-px bg-border -mx-3" />
                           {/* Actions / state */}
                           {cardState.phase === 'idle' && (
-                            <div className="flex gap-2">
-                              <Button size="sm" onClick={() => handleInsertEdit(msg.id, i)}>Insert edit</Button>
-                            </div>
+                            <InsertButton
+                              onInsert={() => handleInsertEdit(msg.id, i)}
+                              onInsertWithComments={() => handleInsertEdit(msg.id, i, et.reasoning)}
+                            />
                           )}
                           {cardState.phase === 'queued' && (
                             <p className="text-xs text-muted-foreground flex items-center gap-1.5">
