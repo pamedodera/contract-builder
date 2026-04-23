@@ -179,12 +179,6 @@ export function ChatInput({ onSend, placeholder = 'Ask the AI assistant…', row
     setVisibleCount(Math.max(1, count))
   }, [attachedFiles])
 
-  function applyPrompt(prompt: string) {
-    setValue(prompt)
-    setPromptOpen(false)
-    textareaRef.current?.focus()
-  }
-
   function handleSend() {
     const text = value.trim()
     if (!text) return

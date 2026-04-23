@@ -426,11 +426,11 @@ interface ActionSpaceSidebarBProps {
   selectedText?: string
   onAskContext?: (text: string) => void
   onEditContext?: (text: string) => void
-  onInsertEditToDoc?: (id: string, original: string, edited: string) => void
+  onInsertEditToDoc?: (id: string, original: string, edited: string, comment?: string) => void
   onGoToEdit?: (id: string) => void
 }
 
-export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, selectedText = '', onAskContext, onEditContext, onInsertEditToDoc, onGoToEdit }: ActionSpaceSidebarBProps) {
+export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, selectedText = '', onInsertEditToDoc, onGoToEdit }: ActionSpaceSidebarBProps) {
   const [activeTab, setActiveTab] = useState<Tab>('enhance')
   const [view, setView] = useState<View>('main')
   const [mode, setMode] = useState<Mode>('chat')
@@ -476,7 +476,7 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, se
       .replace(/\bnotwithstanding\b/g, 'despite')
   }
 
-  function generateMockReasoning(original: string, edited: string): string {
+  function generateMockReasoning(original: string): string {
     const changes: string[] = []
     if (/\bshall\b/.test(original)) changes.push('"shall" replaced with "must" to align with plain English drafting standards and remove ambiguity about obligation')
     if (/\bimmediately\b/.test(original)) changes.push('"immediately" replaced with "promptly" to avoid an unworkable absolute standard — "promptly" implies reasonable speed without implying instantaneous action')
@@ -528,7 +528,7 @@ export function ActionSpaceSidebarB({ contextChips = [], onRemoveContextChip, se
         text: prompt,
         editedTexts: activeChips.map(c => {
           const edited = generateMockEdit(c.text)
-          return { original: c.text, edited, reasoning: generateMockReasoning(c.text, edited) }
+          return { original: c.text, edited, reasoning: generateMockReasoning(c.text) }
         }),
       }
       setEditMessages(prev => [...prev, aiMsg])
